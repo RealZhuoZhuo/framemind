@@ -3,8 +3,9 @@
 import { useProjectStore, STEPS } from "@/store/useProjectStore";
 import { Button } from "@/components/ui/button";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import CharacterDesign from "@/components/project/CharacterDesign";
-import StoryboardTable  from "@/components/project/StoryboardTable";
+import CharacterDesign   from "@/components/project/CharacterDesign";
+import StoryboardTable   from "@/components/project/StoryboardTable";
+import VideoProduction   from "@/components/project/VideoProduction";
 
 const PLACEHOLDERS: Record<string, string> = {
   script:
@@ -47,6 +48,8 @@ export default function StepContent() {
           <CharacterDesign />
         ) : activeStep === "storyboard" ? (
           <StoryboardTable />
+        ) : activeStep === "video" ? (
+          <VideoProduction />
         ) : (
           <textarea
             className="h-full min-h-[400px] w-full resize-none rounded-xl border border-white/8 bg-[#111] p-5 text-sm text-white placeholder:text-white/20 focus:border-green-500/30 focus:outline-none focus:ring-0 leading-relaxed"
