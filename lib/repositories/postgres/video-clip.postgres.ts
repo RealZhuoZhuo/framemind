@@ -1,0 +1,70 @@
+import { db } from "@/lib/db";
+import { videoClips } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import type {
+  IVideoClipRepository,
+  CreateClipInput,
+  UpdateClipInput,
+} from "../interfaces/video-clip.repository";
+import type { VideoClipRow } from "@/lib/db/types";
+
+export class VideoClipPostgresRepository implements IVideoClipRepository {
+  async findByProject(projectId: string): Promise<VideoClipRow[]> {
+    return db.select().from(videoClips).where(eq(videoClips.projectId, projectId));
+  }
+
+  async findById(id: string): Promise<VideoClipRow | null> {
+    const rows = await db.select().from(videoClips).where(eq(videoClips.id, id));
+    return rows[0] ?? null;
+  }
+
+  async create(projectId: string, data: CreateClipInput): Promise<VideoClipRow> {
+    const rows = await db
+      .insert(videoClips)
+      .values({
+        projectId,
+        clipType: data.clipType,
+        startSec: data.startSec,
+        endSec: data.endSec,
+        label: data.label ?? "",
+        url: data.url ?? null,
+        subtitleText: data.subtitleText ?? null,
+      })
+      .returning();
+    return rows[0];
+  }
+
+  async update(id: string, data: UpdateClipInput): Promise<VideoClipRow | null> {
+    const rows = await db
+      .update(videoClips)
+      .set(data)
+      .where(eq(videoClips.id, id))
+      .returning();
+    return rows[0] ?? null;
+  }
+
+  async delete(id: string): Promise<void> {
+    await db.delete(videoClips).where(eq(videoClips.id, id));
+  }
+
+  async replaceAll(projectId: string, clips: CreateClipInput[]): Promise<VideoClipRow[]> {
+    return db.transaction(async (tx) => {
+      await tx.delete(videoClips).where(eq(videoClips.projectId, projectId));
+      if (clips.length === 0) return [];
+      return tx
+        .insert(videoClips)
+        .values(
+          clips.map((c) => ({
+            projectId,
+            clipType: c.clipType,
+            startSec: c.startSec,
+            endSec: c.endSec,
+            label: c.label ?? "",
+            url: c.url ?? null,
+            subtitleText: c.subtitleText ?? null,
+          }))
+        )
+        .returning();
+    });
+  }
+}

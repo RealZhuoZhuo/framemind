@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
-import { Play, Pause, Maximize2, Camera, Volume2, Plus } from "lucide-react";
+import { Play, Pause, Camera, Volume2, Plus } from "lucide-react";
 import { useVideoStore } from "@/store/useVideoStore";
 
 const PX_PER_SEC = 80; // pixels per second on the timeline
@@ -57,7 +57,7 @@ function PreviewArea() {
       {showSubtitles && activeSub && (
         <div className="absolute bottom-8 left-0 right-0 flex justify-center px-10">
           <p
-            className="text-white text-sm font-medium bg-black/55 px-4 py-1.5 rounded text-center leading-snug"
+            className="text-white text-sm font-medium px-4 py-1.5 rounded text-center leading-snug"
             style={{ textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}
           >
             {activeSub.text}
@@ -79,9 +79,21 @@ function ControlsBar() {
 
   return (
     <div className="flex items-center justify-between px-4 h-10 border-t border-b border-white/8 bg-[#0d0d0d] shrink-0">
-      <span className="w-28 text-xs font-mono text-amber-400">
-        {formatTime(currentTime)} / {formatTime(duration)}
-      </span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-white/50">字幕</span>
+        <button
+          onClick={toggleSubs}
+          className={`relative h-4 w-8 rounded-full transition-colors ${
+            showSubtitles ? "bg-amber-400" : "bg-white/20"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${
+              showSubtitles ? "translate-x-4" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+      </div>
 
       <button
         onClick={() => setPlaying(!isPlaying)}
@@ -92,27 +104,9 @@ function ControlsBar() {
           : <Play  className="h-3.5 w-3.5 translate-x-0.5" />}
       </button>
 
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-white/50">字幕</span>
-          <button
-            onClick={toggleSubs}
-            className={`relative h-4 w-8 rounded-full transition-colors ${
-              showSubtitles ? "bg-amber-400" : "bg-white/20"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${
-                showSubtitles ? "translate-x-4" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </div>
-
-        <button className="text-white/30 hover:text-white/60 transition-colors">
-          <Maximize2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      <span className="w-28 text-right text-xs font-mono text-amber-400">
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
     </div>
   );
 }
@@ -390,7 +384,9 @@ export default function VideoProduction() {
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-white/8">
-      <PreviewArea />
+      <div className="w-2/3 mx-auto">
+        <PreviewArea />
+      </div>
       <ControlsBar />
       <Timeline />
     </div>

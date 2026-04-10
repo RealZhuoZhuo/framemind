@@ -15,15 +15,19 @@ type StepState = {
 };
 
 type ProjectStore = {
+  projectId: string | null;
+  isLoading: boolean;
   activeStep: StepKey;
   steps: Record<StepKey, StepState>;
   sidebarCollapsed: boolean;
 
+  init: (projectId: string) => Promise<void>;
   setActiveStep: (step: StepKey) => void;
   setContent: (step: StepKey, content: string) => void;
   markCompleted: (step: StepKey) => void;
   nextStep: () => void;
   canGoNext: () => boolean;
+  canAccess: (step: StepKey) => boolean;
   toggleSidebar: () => void;
 };
 
@@ -34,18 +38,62 @@ const initial: Record<StepKey, StepState> = {
   video:      { completed: false, content: "" },
 };
 
+// Per-step debounce timers for content auto-save
+const _contentTimers: Partial<Record<StepKey, ReturnType<typeof setTimeout>>> = {};
+
+function saveStep(projectId: string, stepKey: StepKey, data: { content?: string; completed?: boolean }) {
+  fetch(`/api/projects/${projectId}/steps/${stepKey}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch(console.error);
+}
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
+  projectId: null,
+  isLoading: false,
   activeStep: "script",
-  steps: initial,
+  steps: { ...initial },
   sidebarCollapsed: false,
 
-  setActiveStep: (step) => set({ activeStep: step }),
+  init: async (projectId) => {
+    set({ projectId, isLoading: true, steps: { ...initial }, activeStep: "script" });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/steps`);
+      const rows: { stepKey: StepKey; completed: boolean; content: string }[] = await res.json();
+
+      const steps: Record<StepKey, StepState> = { ...initial };
+      for (const row of rows) {
+        steps[row.stepKey] = { completed: row.completed, content: row.content };
+      }
+
+      // Land on the first incomplete step
+      const firstIncomplete = STEPS.find((s) => !steps[s.key].completed);
+      set({ steps, isLoading: false, activeStep: firstIncomplete?.key ?? "video" });
+    } catch (e) {
+      console.error("Failed to load steps:", e);
+      set({ isLoading: false });
+    }
+  },
+
+  setActiveStep: (step) => {
+    if (!get().canAccess(step)) return;
+    set({ activeStep: step });
+  },
+
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-  setContent: (step, content) =>
+  setContent: (step, content) => {
     set((s) => ({
       steps: { ...s.steps, [step]: { ...s.steps[step], content } },
-    })),
+    }));
+    const { projectId } = get();
+    if (!projectId) return;
+    if (_contentTimers[step]) clearTimeout(_contentTimers[step]);
+    _contentTimers[step] = setTimeout(() => {
+      saveStep(projectId, step, { content });
+    }, 1000);
+  },
 
   markCompleted: (step) =>
     set((s) => ({
@@ -53,7 +101,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     })),
 
   nextStep: () => {
-    const { activeStep } = get();
+    const { activeStep, steps, projectId } = get();
     const idx = STEPS.findIndex((s) => s.key === activeStep);
     if (idx < STEPS.length - 1) {
       const next = STEPS[idx + 1].key;
@@ -64,6 +112,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           [activeStep]: { ...s.steps[activeStep], completed: true },
         },
       }));
+      if (projectId) {
+        saveStep(projectId, activeStep, {
+          completed: true,
+          content: steps[activeStep].content,
+        });
+      }
     }
   },
 
@@ -71,5 +125,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const { activeStep } = get();
     return STEPS.findIndex((s) => s.key === activeStep) < STEPS.length - 1;
   },
-}));
 
+  canAccess: (step) => {
+    const { steps } = get();
+    const idx = STEPS.findIndex((s) => s.key === step);
+    if (idx === 0) return true;
+    return STEPS.slice(0, idx).every((s) => steps[s.key].completed);
+  },
+}));

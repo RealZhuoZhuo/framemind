@@ -1,10 +1,173 @@
 "use client";
 
-import { Plus, Pencil, Mic, UserCircle2, MoreHorizontal, Play, Download } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useProjectStore } from "@/store/useProjectStore";
+import { Plus, Mic, UserCircle2, MoreHorizontal, Play, Download, Pencil, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCharacterStore, type Character } from "@/store/useCharacterStore";
 
-function CharacterCard({ char }: { char: Character }) {
+// ─── Edit Modal ────────────────────────────────────────────────────────────────
+
+type EditFields = Pick<Character, "name" | "appearance" | "clothing" | "description">;
+
+function EditCharacterModal({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: EditFields;
+  onClose: () => void;
+  onSave: (data: EditFields) => void | Promise<void>;
+}) {
+  const [form, setForm] = useState<EditFields>(initial);
+
+  const [loading, setLoading] = useState(false);
+
+  const set = (key: keyof EditFields, value: string) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await onSave(form);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative flex w-[780px] max-h-[88vh] overflow-hidden rounded-2xl border border-white/10 bg-[#161616] shadow-2xl">
+        {/* Header */}
+        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#161616] px-7 py-4">
+          <h2 className="text-sm font-semibold text-white">角色编辑</h2>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-white/30 hover:bg-white/8 hover:text-white/60 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex w-full pt-[57px] pb-[61px] overflow-hidden">
+          {/* Left: image preview — half width, full height */}
+          <div className="relative flex w-1/2 shrink-0 flex-col items-center justify-center border-r border-white/8 bg-[#111]">
+            <UserCircle2 className="h-24 w-24 text-white/10" />
+            <span className="mt-3 text-[11px] text-white/25">请生成角色形象</span>
+            <button className="absolute bottom-6 rounded-lg bg-white/8 px-5 py-2 text-xs text-white/50 hover:bg-white/14 hover:text-white/70 transition-colors">
+              生成形象
+            </button>
+          </div>
+
+          {/* Right: scrollable form */}
+          <div className="flex w-1/2 flex-col gap-4 overflow-y-auto px-7 py-6">
+            {/* 名称 */}
+            <Field label="名称">
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+
+            {/* 外貌 */}
+            <Field label="外貌">
+              <textarea
+                rows={3}
+                value={form.appearance}
+                onChange={(e) => set("appearance", e.target.value)}
+                className={textareaCls}
+              />
+            </Field>
+
+            {/* 穿着 */}
+            <Field label="穿着">
+              <textarea
+                rows={3}
+                value={form.clothing}
+                onChange={(e) => set("clothing", e.target.value)}
+                className={textareaCls}
+              />
+            </Field>
+
+            {/* 角色描述 */}
+            <Field label="角色描述">
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                className={textareaCls}
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-3 border-t border-white/8 bg-[#161616] px-7 py-4">
+          <button
+            onClick={onClose}
+            className="h-9 rounded-lg px-5 text-sm text-white/40 hover:text-white/60 transition-colors"
+          >
+            取消
+          </button>
+          <button
+            disabled={loading}
+            onClick={() => { handleSave(); }}
+            className="h-9 rounded-lg bg-green-500 px-6 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-40 transition-opacity"
+          >
+            {loading ? "保存中…" : "保存"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputCls =
+  "w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-white placeholder:text-white/20 focus:border-green-500/40 focus:outline-none transition-colors";
+const textareaCls =
+  "w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder:text-white/20 focus:border-green-500/40 focus:outline-none transition-colors leading-relaxed";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs text-white/40">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ─── Character Card ────────────────────────────────────────────────────────────
+
+function CharacterCard({
+  char,
+  onEdit,
+  onDelete,
+}: {
+  char: Character;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   return (
     <div
       className={cn(
@@ -13,44 +176,69 @@ function CharacterCard({ char }: { char: Character }) {
         "hover:shadow-lg hover:shadow-black/40"
       )}
     >
-      {/* Top action bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <div className="flex items-center gap-1.5">
-          <button className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white hover:bg-white/10 transition-colors">
-            <Pencil className="h-3 w-3" /> 编辑角色
-          </button>
-          <button className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white hover:bg-white/10 transition-colors">
-            <Mic className="h-3 w-3" /> 编辑声音
-          </button>
-        </div>
-        <button className="flex h-6 w-6 items-center justify-center rounded-md text-white/30 hover:bg-white/8 hover:text-white/70 transition-colors">
+      {/* Three-dot menu */}
+      <div ref={menuRef} className="absolute right-2.5 top-2.5 z-10">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-white/30 hover:bg-white/10 hover:text-white/70 transition-colors"
+        >
           <MoreHorizontal className="h-4 w-4" />
         </button>
+
+        {menuOpen && (
+          <div className="absolute right-0 top-8 min-w-[130px] rounded-xl border border-white/10 bg-[#1e1e1e] py-1 shadow-xl">
+            <MenuItem icon={<Pencil className="h-3.5 w-3.5" />}  label="编辑角色" onClick={() => { setMenuOpen(false); onEdit(); }} />
+            <MenuItem icon={<Mic className="h-3.5 w-3.5" />}     label="编辑声音" onClick={() => setMenuOpen(false)} />
+            <MenuItem icon={<Play className="h-3.5 w-3.5" />}    label="预览"     onClick={() => setMenuOpen(false)} />
+            <MenuItem icon={<Download className="h-3.5 w-3.5" />} label="下载"   onClick={() => setMenuOpen(false)} />
+            <div className="my-1 border-t border-white/8" />
+            <MenuItem icon={<Trash2 className="h-3.5 w-3.5" />}  label="删除" onClick={() => { setMenuOpen(false); onDelete(); }} danger />
+          </div>
+        )}
       </div>
 
       {/* Image area */}
-      <div className={cn("relative flex h-40 items-center justify-center bg-gradient-to-b", char.gradientFrom, "to-[#111]")}>
+      <div className={cn("relative flex h-44 items-center justify-center bg-gradient-to-b", char.gradientFrom, "to-[#111]")}>
         <UserCircle2 className="h-20 w-20 text-white/10" />
       </div>
 
       {/* Info */}
-      <div className="flex flex-col gap-2 px-4 pt-3 pb-2">
+      <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
         <h3 className="text-center text-sm font-bold text-white">{char.name}</h3>
-        <p className="line-clamp-3 text-xs leading-relaxed text-white">{char.description}</p>
-      </div>
-
-      {/* Bottom actions */}
-      <div className="flex items-center gap-2 px-4 pb-4 pt-1">
-        <button className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 py-1.5 text-xs text-white hover:bg-white/10 transition-colors">
-          <Play className="h-3 w-3" /> 预览
-        </button>
-        <button className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 py-1.5 text-xs text-white hover:bg-white/10 transition-colors">
-          <Download className="h-3 w-3" /> 下载
-        </button>
+        <p className="line-clamp-3 text-xs leading-relaxed text-white/60">{char.description}</p>
       </div>
     </div>
   );
 }
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition-colors",
+        danger
+          ? "text-red-400/80 hover:bg-red-500/8 hover:text-red-400"
+          : "text-white/60 hover:bg-white/6 hover:text-white"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+// ─── Add Card ──────────────────────────────────────────────────────────────────
 
 function AddCard({ onClick }: { onClick: () => void }) {
   return (
@@ -70,33 +258,66 @@ function AddCard({ onClick }: { onClick: () => void }) {
   );
 }
 
-const BORDER_COLORS = [
-  { borderColor: "border-yellow-500/60", gradientFrom: "from-yellow-900/30" },
-  { borderColor: "border-green-500/60",  gradientFrom: "from-green-900/30"  },
-  { borderColor: "border-purple-500/60", gradientFrom: "from-purple-900/30" },
-  { borderColor: "border-blue-500/60",   gradientFrom: "from-blue-900/30"   },
-  { borderColor: "border-rose-500/60",   gradientFrom: "from-rose-900/30"   },
-];
+// ─── Main Component ─────────────────────────────────────────��──────────────────
 
 export default function CharacterDesign() {
-  const { characters, addCharacter } = useCharacterStore();
+  const projectId = useProjectStore((s) => s.projectId);
+  const { characters, isLoading, init, addCharacter, updateCharacter, removeCharacter } = useCharacterStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
-  const handleAdd = () => {
-    const style = BORDER_COLORS[characters.length % BORDER_COLORS.length];
-    addCharacter({
-      id: String(Date.now()),
-      name: "新角色",
-      description: "请填写角色描述……",
-      ...style,
-    });
-  };
+  useEffect(() => {
+    if (projectId) init(projectId);
+  }, [projectId, init]);
+
+  const editingChar = characters.find((c) => c.id === editingId) ?? null;
+
+  if (isLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <span className="text-sm text-white/30">加载中…</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      {characters.map((c) => (
-        <CharacterCard key={c.id} char={c} />
-      ))}
-      <AddCard onClick={handleAdd} />
-    </div>
+    <>
+      <div className="grid grid-cols-4 gap-4">
+        {characters.map((c) => (
+          <CharacterCard
+            key={c.id}
+            char={c}
+            onEdit={() => setEditingId(c.id)}
+            onDelete={() => removeCharacter(c.id)}
+          />
+        ))}
+        <AddCard onClick={() => setAdding(true)} />
+      </div>
+
+      {/* Add modal */}
+      {adding && (
+        <EditCharacterModal
+          initial={{ name: "", appearance: "", clothing: "", description: "" }}
+          onClose={() => setAdding(false)}
+          onSave={async (data) => {
+            if (projectId) await addCharacter(projectId, data);
+            setAdding(false);
+          }}
+        />
+      )}
+
+      {/* Edit modal */}
+      {editingChar && (
+        <EditCharacterModal
+          initial={{
+            name: editingChar.name,
+            appearance: editingChar.appearance,
+            clothing: editingChar.clothing,
+            description: editingChar.description,
+          }}
+          onClose={() => setEditingId(null)}
+          onSave={(data) => updateCharacter(editingChar.id, data)}        />
+      )}
+    </>
   );
 }
