@@ -13,6 +13,30 @@ type Project = {
   updatedAt: string;
 };
 
+type ProjectRow = {
+  id: string;
+  title: string;
+  gradient: string;
+  updatedAt: string;
+};
+
+async function readJsonOrThrow<T>(res: Response): Promise<T> {
+  const payload = await res.json();
+
+  if (!res.ok) {
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Request failed";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
 function CreateCard({ onClick }: { onClick?: () => void }) {
   return (
     <div className="flex flex-col gap-2.5">
@@ -194,10 +218,10 @@ export default function ProjectGrid() {
 
   useEffect(() => {
     fetch("/api/projects")
-      .then((r) => r.json())
+      .then((r) => readJsonOrThrow<ProjectRow[] | { error: string }>(r))
       .then((rows) =>
         setProjects(
-          rows.map((p: { id: string; title: string; gradient: string; updatedAt: string }) => ({
+          (Array.isArray(rows) ? rows : []).map((p) => ({
             id: p.id,
             title: p.title,
             gradient: p.gradient,
@@ -220,22 +244,26 @@ export default function ProjectGrid() {
         visualStyle,
       }),
     });
-    const project = await res.json();
+    const project = await readJsonOrThrow<{ id: string }>(res);
     router.push(`/project/${project.id}`);
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      throw new Error("Failed to delete project");
+    }
     setProjects((prev) => prev.filter((p) => p.id !== id));
   };
 
   const handleRename = async (name: string) => {
     if (!renaming) return;
-    await fetch(`/api/projects/${renaming.id}`, {
+    const res = await fetch(`/api/projects/${renaming.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: name }),
     });
+    await readJsonOrThrow(res);
     setProjects((prev) =>
       prev.map((p) => (p.id === renaming.id ? { ...p, title: name } : p))
     );

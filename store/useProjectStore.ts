@@ -41,6 +41,23 @@ const initial: Record<StepKey, StepState> = {
 // Per-step debounce timers for content auto-save
 const _contentTimers: Partial<Record<StepKey, ReturnType<typeof setTimeout>>> = {};
 
+async function readJsonOrThrow<T>(res: Response): Promise<T> {
+  const payload = await res.json();
+
+  if (!res.ok) {
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Request failed";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
 function saveStep(projectId: string, stepKey: StepKey, data: { content?: string; completed?: boolean }) {
   fetch(`/api/projects/${projectId}/steps/${stepKey}`, {
     method: "PATCH",
@@ -60,7 +77,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ projectId, isLoading: true, steps: { ...initial }, activeStep: "script" });
     try {
       const res = await fetch(`/api/projects/${projectId}/steps`);
-      const rows: { stepKey: StepKey; completed: boolean; content: string }[] = await res.json();
+      const rows = await readJsonOrThrow<{ stepKey: StepKey; completed: boolean; content: string }[]>(res);
+      if (!Array.isArray(rows)) {
+        throw new Error("Invalid steps payload");
+      }
 
       const steps: Record<StepKey, StepState> = { ...initial };
       for (const row of rows) {

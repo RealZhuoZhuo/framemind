@@ -23,6 +23,23 @@ function assignStyle(idx: number) {
   return BORDER_COLORS[idx % BORDER_COLORS.length];
 }
 
+async function readJsonOrThrow<T>(res: Response): Promise<T> {
+  const payload = await res.json();
+
+  if (!res.ok) {
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Request failed";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
 type CharacterStore = {
   projectId: string | null;
   isLoading: boolean;
@@ -42,7 +59,10 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     set({ projectId, isLoading: true, characters: [] });
     try {
       const res = await fetch(`/api/projects/${projectId}/characters`);
-      const rows: { id: string; name: string; appearance: string; clothing: string; description: string }[] = await res.json();
+      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; clothing: string; description: string }[]>(res);
+      if (!Array.isArray(rows)) {
+        throw new Error("Invalid characters payload");
+      }
       const characters: Character[] = rows.map((r, i) => ({ ...r, ...assignStyle(i) }));
       set({ characters, isLoading: false });
     } catch (e) {
@@ -57,7 +77,7 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: data?.name || "新角色", appearance: data?.appearance, clothing: data?.clothing, description: data?.description }),
     });
-    const row: { id: string; name: string; appearance: string; clothing: string; description: string } = await res.json();
+    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; clothing: string; description: string }>(res);
     set((s) => ({
       characters: [...s.characters, { ...row, ...assignStyle(s.characters.length) }],
     }));

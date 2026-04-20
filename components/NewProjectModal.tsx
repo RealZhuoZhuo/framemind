@@ -48,6 +48,7 @@ export default function NewProjectModal({
   const [aspectRatio, setAspectRatio] = useState<AspectRatio | null>(null);
   const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function NewProjectModal({
   const handleConfirm = async () => {
     if (!canConfirm) return;
     setLoading(true);
+    setErrorMessage("");
     try {
       await onCreate({
         name: name.trim() || "未命名",
@@ -68,6 +70,8 @@ export default function NewProjectModal({
         aspectRatio,
         visualStyle,
       });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "创建项目失败");
     } finally {
       setLoading(false);
     }
@@ -232,6 +236,11 @@ export default function NewProjectModal({
         )}
 
         {/* Footer */}
+        {errorMessage ? (
+          <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {errorMessage}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}

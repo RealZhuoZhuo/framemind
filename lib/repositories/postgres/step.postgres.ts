@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
+import { ensureDatabaseSchema } from "@/lib/db";
 import { projectSteps } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { IStepRepository, StepKey, UpdateStepInput } from "../interfaces/step.repository";
@@ -8,6 +10,7 @@ const ALL_STEP_KEYS: StepKey[] = ["script", "character", "storyboard", "video"];
 
 export class StepPostgresRepository implements IStepRepository {
   async findByProject(projectId: string): Promise<StepRow[]> {
+    await ensureDatabaseSchema();
     return db
       .select()
       .from(projectSteps)
@@ -15,9 +18,18 @@ export class StepPostgresRepository implements IStepRepository {
   }
 
   async initForProject(projectId: string): Promise<StepRow[]> {
+    await ensureDatabaseSchema();
     const rows = await db
       .insert(projectSteps)
-      .values(ALL_STEP_KEYS.map((key) => ({ projectId, stepKey: key })))
+      .values(
+        ALL_STEP_KEYS.map((key) => ({
+          id: randomUUID(),
+          projectId,
+          stepKey: key,
+          completed: false,
+          content: "",
+        }))
+      )
       .onConflictDoNothing()
       .returning();
 
@@ -29,6 +41,7 @@ export class StepPostgresRepository implements IStepRepository {
   }
 
   async upsert(projectId: string, stepKey: StepKey, data: UpdateStepInput): Promise<StepRow> {
+    await ensureDatabaseSchema();
     const set: Record<string, unknown> = {};
     if (data.content !== undefined) set.content = data.content;
     if (data.completed !== undefined) set.completed = data.completed;
@@ -36,6 +49,7 @@ export class StepPostgresRepository implements IStepRepository {
     const rows = await db
       .insert(projectSteps)
       .values({
+        id: randomUUID(),
         projectId,
         stepKey,
         content: data.content ?? "",

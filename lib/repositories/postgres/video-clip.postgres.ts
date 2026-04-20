@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
+import { ensureDatabaseSchema } from "@/lib/db";
 import { videoClips } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type {
@@ -10,18 +12,22 @@ import type { VideoClipRow } from "@/lib/db/types";
 
 export class VideoClipPostgresRepository implements IVideoClipRepository {
   async findByProject(projectId: string): Promise<VideoClipRow[]> {
+    await ensureDatabaseSchema();
     return db.select().from(videoClips).where(eq(videoClips.projectId, projectId));
   }
 
   async findById(id: string): Promise<VideoClipRow | null> {
+    await ensureDatabaseSchema();
     const rows = await db.select().from(videoClips).where(eq(videoClips.id, id));
     return rows[0] ?? null;
   }
 
   async create(projectId: string, data: CreateClipInput): Promise<VideoClipRow> {
+    await ensureDatabaseSchema();
     const rows = await db
       .insert(videoClips)
       .values({
+        id: randomUUID(),
         projectId,
         clipType: data.clipType,
         startSec: data.startSec,
@@ -35,6 +41,7 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
   }
 
   async update(id: string, data: UpdateClipInput): Promise<VideoClipRow | null> {
+    await ensureDatabaseSchema();
     const rows = await db
       .update(videoClips)
       .set(data)
@@ -44,10 +51,12 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
   }
 
   async delete(id: string): Promise<void> {
+    await ensureDatabaseSchema();
     await db.delete(videoClips).where(eq(videoClips.id, id));
   }
 
   async replaceAll(projectId: string, clips: CreateClipInput[]): Promise<VideoClipRow[]> {
+    await ensureDatabaseSchema();
     return db.transaction(async (tx) => {
       await tx.delete(videoClips).where(eq(videoClips.projectId, projectId));
       if (clips.length === 0) return [];
@@ -55,6 +64,7 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
         .insert(videoClips)
         .values(
           clips.map((c) => ({
+            id: randomUUID(),
             projectId,
             clipType: c.clipType,
             startSec: c.startSec,
