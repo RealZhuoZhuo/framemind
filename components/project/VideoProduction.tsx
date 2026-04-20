@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
-import { Play, Pause, Camera, Volume2, Plus } from "lucide-react";
+import { Play, Pause, Camera, Volume2 } from "lucide-react";
 import { useVideoStore } from "@/store/useVideoStore";
 
 const PX_PER_SEC = 80; // pixels per second on the timeline
@@ -83,13 +83,16 @@ function ControlsBar() {
         <span className="text-xs text-white/50">字幕</span>
         <button
           onClick={toggleSubs}
-          className={`relative h-4 w-8 rounded-full transition-colors ${
-            showSubtitles ? "bg-amber-400" : "bg-white/20"
+          aria-pressed={showSubtitles}
+          className={`relative flex h-5 w-9 items-center rounded-full border transition-colors ${
+            showSubtitles
+              ? "border-green-400/60 bg-green-500/90"
+              : "border-white/10 bg-white/8"
           }`}
         >
           <span
-            className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${
-              showSubtitles ? "translate-x-4" : "translate-x-0.5"
+            className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.35)] transition-transform ${
+              showSubtitles ? "translate-x-4.5" : "translate-x-0.5"
             }`}
           />
         </button>
@@ -107,20 +110,6 @@ function ControlsBar() {
       <span className="w-28 text-right text-xs font-mono text-amber-400">
         {formatTime(currentTime)} / {formatTime(duration)}
       </span>
-    </div>
-  );
-}
-
-/* ─── Add-clip "+" button ────────────────────────────────────────────────── */
-function AddClipBtn({ x }: { x: number }) {
-  return (
-    <div
-      className="absolute top-1/2 -translate-y-1/2 z-10"
-      style={{ left: x - 8 }}
-    >
-      <button className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-white/50 hover:bg-amber-400/80 hover:text-white transition-all">
-        <Plus className="h-2.5 w-2.5" />
-      </button>
     </div>
   );
 }
@@ -229,7 +218,7 @@ function Timeline() {
 
           {/* ── Subtitle track ── */}
           <div className="relative h-8 bg-[#0f0f0f] border-b border-white/5">
-            {subtitleClips.map((clip, ci) => {
+            {subtitleClips.map((clip) => {
               const clipW = (clip.end - clip.start) * PX_PER_SEC - 2;
               return (
                 <div
@@ -248,19 +237,9 @@ function Timeline() {
                       {clip.text}
                     </span>
                   )}
-                  {/* "+" between clips */}
-                  {ci < subtitleClips.length - 1 && (
-                    <AddClipBtn x={clipW - 2} />
-                  )}
                 </div>
               );
             })}
-            {/* "+" after last subtitle clip */}
-            {subtitleClips.length > 0 && (
-              <AddClipBtn
-                x={subtitleClips[subtitleClips.length - 1].end * PX_PER_SEC + 8}
-              />
-            )}
           </div>
 
           {/* ── Audio / dubbing track ── */}
@@ -323,12 +302,6 @@ function Timeline() {
                 </div>
               </div>
             ))}
-            {/* "+" after last video clip */}
-            {videoClips.length > 0 && (
-              <AddClipBtn
-                x={videoClips[videoClips.length - 1].end * PX_PER_SEC + 8}
-              />
-            )}
           </div>
         </div>
       </div>
