@@ -33,7 +33,7 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
         startSec: data.startSec,
         endSec: data.endSec,
         label: data.label ?? "",
-        url: data.url ?? null,
+        mediaUrl: data.mediaUrl ?? null,
         subtitleText: data.subtitleText ?? null,
       })
       .returning();
@@ -70,7 +70,7 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
             startSec: c.startSec,
             endSec: c.endSec,
             label: c.label ?? "",
-            url: c.url ?? null,
+            mediaUrl: c.mediaUrl ?? null,
             subtitleText: c.subtitleText ?? null,
           }))
         )

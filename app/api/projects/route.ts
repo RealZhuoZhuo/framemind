@@ -1,5 +1,5 @@
 import { projectRepo, stepRepo } from "@/lib/repositories";
-import { ok, created, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { ok, created, serverError } from "@/app/api/_helpers/api-response";
 
 export async function GET() {
   try {
@@ -13,13 +13,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, gradient, videoMode, aspectRatio, visualStyle } = body;
+    const { title, videoMode, aspectRatio, visualStyle } = body;
 
-    if (!gradient || typeof gradient !== "string") {
-      return badRequest("gradient is required");
-    }
-
-    const project = await projectRepo.create({ title, gradient, videoMode, aspectRatio, visualStyle });
+    const project = await projectRepo.create({ title, videoMode, aspectRatio, visualStyle });
     await stepRepo.initForProject(project.id);
     return created(project);
   } catch (e) {

@@ -9,16 +9,16 @@ import NewProjectModal from "@/components/NewProjectModal";
 type Project = {
   id: string;
   title: string;
-  gradient: string;
   updatedAt: string;
 };
 
 type ProjectRow = {
   id: string;
   title: string;
-  gradient: string;
   updatedAt: string;
 };
+
+const PROJECT_CARD_GRADIENT = "from-slate-800 via-slate-700 to-slate-900";
 
 async function readJsonOrThrow<T>(res: Response): Promise<T> {
   const payload = await res.json();
@@ -92,7 +92,7 @@ function ProjectCard({
         onClick={onCardClick}
         className={cn(
           "group relative aspect-video w-full overflow-hidden rounded-2xl",
-          `bg-gradient-to-br ${project.gradient}`,
+          `bg-gradient-to-br ${PROJECT_CARD_GRADIENT}`,
           "cursor-pointer transition-transform duration-200 hover:scale-[1.02]",
           "shadow-md hover:shadow-lg hover:shadow-black/40"
         )}
@@ -224,7 +224,6 @@ export default function ProjectGrid() {
           (Array.isArray(rows) ? rows : []).map((p) => ({
             id: p.id,
             title: p.title,
-            gradient: p.gradient,
             updatedAt: formatDate(p.updatedAt),
           }))
         )
@@ -238,7 +237,6 @@ export default function ProjectGrid() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: name,
-        gradient: "from-slate-800 via-slate-700 to-slate-900",
         videoMode,
         aspectRatio,
         visualStyle,

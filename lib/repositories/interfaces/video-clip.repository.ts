@@ -16,7 +16,7 @@ export type CreateClipInput = {
   startSec: number;
   endSec: number;
   label?: string;
-  url?: string | null;
+  mediaUrl?: string | null;
   subtitleText?: string | null;
 };
 

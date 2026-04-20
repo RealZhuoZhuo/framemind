@@ -6,20 +6,24 @@ import {
   integer,
   real,
   timestamp,
+  index,
   unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const projects = pgTable("projects", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: text("title").notNull().default("未命名"),
-  gradient: text("gradient").notNull(),
-  videoMode: text("video_mode"),   // 'drama' | 'narration' | 'talking-head'
-  aspectRatio: text("aspect_ratio"), // '16:9' | '9:16' | '1:1'
-  visualStyle: text("visual_style"), // 'realistic' | '3d-animation' | 'japanese-anime'
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    title: text("title").notNull().default("未命名"),
+    videoMode: text("video_mode"),   // 'drama' | 'narration' | 'talking-head'
+    aspectRatio: text("aspect_ratio"), // '16:9' | '9:16' | '1:1'
+    visualStyle: text("visual_style"), // 'realistic' | '3d-animation' | 'japanese-anime'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("projects_updated_at_idx").on(table.updatedAt)]
+);
 
 export const projectSteps = pgTable(
   "project_steps",
@@ -34,47 +38,64 @@ export const projectSteps = pgTable(
   },
   (table) => [
     unique("project_steps_unique_project_step").on(table.projectId, table.stepKey),
+    index("project_steps_project_id_idx").on(table.projectId),
   ]
 );
 
-export const characters = pgTable("characters", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  appearance: text("appearance").notNull().default(""),
-  clothing: text("clothing").notNull().default(""),
-  description: text("description").notNull().default(""),
-  mediaUrl: text("media_url"),
-});
+export const characters = pgTable(
+  "characters",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    appearance: text("appearance").notNull().default(""),
+    clothing: text("clothing").notNull().default(""),
+    description: text("description").notNull().default(""),
+    mediaUrl: text("media_url"),
+  },
+  (table) => [index("characters_project_id_idx").on(table.projectId)]
+);
 
-export const shots = pgTable("shots", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  shotNumber: integer("shot_number").notNull(),
-  description: text("description").notNull().default(""),
-  sceneType: text("scene_type").notNull().default(""),
-  cameraAngle: text("camera_angle").notNull().default(""),
-  narration: text("narration").notNull().default(""),
-  characterId: uuid("character_id").references(() => characters.id, { onDelete: "set null" }),
-  dialogue: text("dialogue").notNull().default(""),
-  notes: text("notes").notNull().default(""),
-  mediaGenerated: boolean("media_generated").notNull().default(false),
-  mediaUrl: text("media_url"),
-});
+export const shots = pgTable(
+  "shots",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    shotNumber: integer("shot_number").notNull(),
+    description: text("description").notNull().default(""),
+    sceneType: text("scene_type").notNull().default(""),
+    cameraAngle: text("camera_angle").notNull().default(""),
+    narration: text("narration").notNull().default(""),
+    characterId: uuid("character_id").references(() => characters.id, { onDelete: "set null" }),
+    dialogue: text("dialogue").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    mediaGenerated: boolean("media_generated").notNull().default(false),
+    mediaUrl: text("media_url"),
+  },
+  (table) => [
+    index("shots_project_id_idx").on(table.projectId),
+    index("shots_project_id_shot_number_idx").on(table.projectId, table.shotNumber),
+    index("shots_character_id_idx").on(table.characterId),
+  ]
+);
 
-export const videoClips = pgTable("video_clips", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  clipType: text("clip_type").notNull(), // 'video' | 'subtitle' | 'audio'
-  startSec: real("start_sec").notNull(),
-  endSec: real("end_sec").notNull(),
-  label: text("label").notNull().default(""),
-  url: text("url"),
-  subtitleText: text("subtitle_text"),
-});
+export const videoClips = pgTable(
+  "video_clips",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    clipType: text("clip_type").notNull(), // 'video' | 'subtitle' | 'audio'
+    startSec: real("start_sec").notNull(),
+    endSec: real("end_sec").notNull(),
+    label: text("label").notNull().default(""),
+    mediaUrl: text("media_url"),
+    subtitleText: text("subtitle_text"),
+  },
+  (table) => [index("video_clips_project_id_idx").on(table.projectId)]
+);

@@ -35,7 +35,7 @@ export async function GET(
 
     const videoClips = clips
       .filter((c) => c.clipType === "video")
-      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, url: c.url ?? "", label: c.label }));
+      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label }));
 
     const subtitleClips = clips
       .filter((c) => c.clipType === "subtitle")
@@ -64,9 +64,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title, gradient } = body;
+    const { title } = body;
 
-    const updated = await projectRepo.update(id, { title, gradient });
+    const updated = await projectRepo.update(id, { title });
     if (!updated) return notFound("Project not found");
     return ok(updated);
   } catch (e) {

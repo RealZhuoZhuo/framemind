@@ -24,7 +24,7 @@ export async function PATCH(
       patch.endSec = body.endSec;
     }
     if (body.label !== undefined) patch.label = String(body.label);
-    if ("url" in body) patch.url = body.url ?? null;
+    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
     if ("subtitleText" in body) patch.subtitleText = body.subtitleText ?? null;
 
     const updated = await videoClipRepo.update(cid, patch);

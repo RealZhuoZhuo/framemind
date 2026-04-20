@@ -46,7 +46,7 @@ function PreviewArea() {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={clip.id}
-          src={clip.url}
+          src={clip.mediaUrl}
           alt={clip.label}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
           style={{ opacity: clip.id === activeClip?.id ? 1 : 0 }}
@@ -286,7 +286,7 @@ function Timeline() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={clip.url}
+                  src={clip.mediaUrl}
                   alt={clip.label}
                   className="h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                 />

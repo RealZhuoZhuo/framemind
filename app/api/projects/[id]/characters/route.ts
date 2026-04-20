@@ -1,5 +1,5 @@
-import { characterRepo } from "@/lib/repositories";
-import { ok, created, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { characterRepo, projectRepo } from "@/lib/repositories";
+import { ok, created, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
 
 export async function GET(
   _request: Request,
@@ -7,6 +7,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const project = await projectRepo.findById(id);
+    if (!project) return notFound("Project not found");
     const characters = await characterRepo.findByProject(id);
     return ok(characters);
   } catch (e) {
@@ -20,6 +22,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const project = await projectRepo.findById(id);
+    if (!project) return notFound("Project not found");
     const body = await request.json();
     const { name, appearance, clothing, description } = body;
 

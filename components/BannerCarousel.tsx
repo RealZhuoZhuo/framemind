@@ -6,6 +6,13 @@ import { cn } from "@/lib/utils";
 import { useHomeStore } from "@/store/useHomeStore";
 
 const VISIBLE = 3;
+const BANNER_GRADIENTS = [
+  "from-violet-950 via-purple-900 to-indigo-950",
+  "from-zinc-900 via-zinc-800 to-neutral-900",
+  "from-yellow-950 via-amber-900 to-stone-900",
+  "from-emerald-950 via-teal-900 to-slate-900",
+  "from-blue-950 via-sky-900 to-slate-900",
+] as const;
 
 export default function BannerCarousel() {
   const { banners } = useHomeStore();
@@ -41,7 +48,7 @@ export default function BannerCarousel() {
             <div
               className={cn(
                 "relative overflow-hidden rounded-2xl bg-gradient-to-br h-[260px]",
-                banner.gradient,
+                BANNER_GRADIENTS[(offset + i) % BANNER_GRADIENTS.length],
                 "transition-transform duration-200 group-hover:scale-[1.015]",
                 "shadow-lg group-hover:shadow-2xl group-hover:shadow-black/60"
               )}

@@ -35,7 +35,6 @@ const SCHEMA_STATEMENTS = [
   `create table if not exists projects (
     id uuid primary key,
     title text not null default '未命名',
-    gradient text not null default 'from-slate-800 via-slate-700 to-slate-900',
     video_mode text,
     aspect_ratio text,
     visual_style text,
@@ -43,22 +42,21 @@ const SCHEMA_STATEMENTS = [
     updated_at timestamptz not null default now()
   )`,
   `alter table projects add column if not exists title text`,
-  `alter table projects add column if not exists gradient text`,
   `alter table projects add column if not exists video_mode text`,
   `alter table projects add column if not exists aspect_ratio text`,
   `alter table projects add column if not exists visual_style text`,
   `alter table projects add column if not exists created_at timestamptz`,
   `alter table projects add column if not exists updated_at timestamptz`,
+  `alter table projects drop column if exists gradient`,
   `update projects
     set
       title = coalesce(title, '未命名'),
-      gradient = coalesce(gradient, 'from-slate-800 via-slate-700 to-slate-900'),
       created_at = coalesce(created_at, now()),
       updated_at = coalesce(updated_at, now())`,
   `alter table projects alter column title set default '未命名'`,
-  `alter table projects alter column gradient set default 'from-slate-800 via-slate-700 to-slate-900'`,
   `alter table projects alter column created_at set default now()`,
   `alter table projects alter column updated_at set default now()`,
+  `create index if not exists projects_updated_at_idx on projects (updated_at)`,
   `create table if not exists project_steps (
     id uuid primary key,
     project_id uuid not null references projects(id) on delete cascade,
@@ -75,6 +73,7 @@ const SCHEMA_STATEMENTS = [
   `alter table project_steps alter column completed set default false`,
   `alter table project_steps alter column content set default ''`,
   `create unique index if not exists project_steps_unique_project_step on project_steps (project_id, step_key)`,
+  `create index if not exists project_steps_project_id_idx on project_steps (project_id)`,
   `create table if not exists characters (
     id uuid primary key,
     project_id uuid not null references projects(id) on delete cascade,
@@ -96,6 +95,7 @@ const SCHEMA_STATEMENTS = [
   `alter table characters alter column appearance set default ''`,
   `alter table characters alter column clothing set default ''`,
   `alter table characters alter column description set default ''`,
+  `create index if not exists characters_project_id_idx on characters (project_id)`,
   `create table if not exists shots (
     id uuid primary key,
     project_id uuid not null references projects(id) on delete cascade,
@@ -135,6 +135,9 @@ const SCHEMA_STATEMENTS = [
   `alter table shots alter column dialogue set default ''`,
   `alter table shots alter column notes set default ''`,
   `alter table shots alter column media_generated set default false`,
+  `create index if not exists shots_project_id_idx on shots (project_id)`,
+  `create index if not exists shots_project_id_shot_number_idx on shots (project_id, shot_number)`,
+  `create index if not exists shots_character_id_idx on shots (character_id)`,
   `create table if not exists video_clips (
     id uuid primary key,
     project_id uuid not null references projects(id) on delete cascade,
@@ -142,14 +145,49 @@ const SCHEMA_STATEMENTS = [
     start_sec real not null,
     end_sec real not null,
     label text not null default '',
-    url text,
+    media_url text,
     subtitle_text text
   )`,
   `alter table video_clips add column if not exists label text`,
-  `alter table video_clips add column if not exists url text`,
+  `alter table video_clips add column if not exists media_url text`,
   `alter table video_clips add column if not exists subtitle_text text`,
+  `do $$
+  begin
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = current_schema()
+        and table_name = 'video_clips'
+        and column_name = 'url'
+    ) and not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = current_schema()
+        and table_name = 'video_clips'
+        and column_name = 'media_url'
+    ) then
+      alter table video_clips rename column url to media_url;
+    elsif exists (
+      select 1
+      from information_schema.columns
+      where table_schema = current_schema()
+        and table_name = 'video_clips'
+        and column_name = 'url'
+    ) and exists (
+      select 1
+      from information_schema.columns
+      where table_schema = current_schema()
+        and table_name = 'video_clips'
+        and column_name = 'media_url'
+    ) then
+      update video_clips
+      set media_url = coalesce(media_url, url);
+      alter table video_clips drop column url;
+    end if;
+  end $$;`,
   `update video_clips set label = coalesce(label, '')`,
   `alter table video_clips alter column label set default ''`,
+  `create index if not exists video_clips_project_id_idx on video_clips (project_id)`,
 ] as const;
 
 async function bootstrapSchema() {

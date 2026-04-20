@@ -7,7 +7,7 @@ function formatTimeline(clips: VideoClipRow[]) {
   return {
     videoClips: clips
       .filter((c) => c.clipType === "video")
-      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, url: c.url ?? "", label: c.label })),
+      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label })),
     subtitleClips: clips
       .filter((c) => c.clipType === "subtitle")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, text: c.subtitleText ?? "" })),
@@ -40,16 +40,16 @@ export async function PUT(
     const body = await request.json();
     const { videoClips = [], subtitleClips = [], audioClips = [] } = body;
 
-    type RawVideo    = { start: number; end: number; url?: string; label?: string };
+    type RawVideo = { start: number; end: number; mediaUrl?: string; label?: string };
     type RawSubtitle = { start: number; end: number; text?: string };
-    type RawAudio    = { start: number; end: number; label?: string };
+    type RawAudio = { start: number; end: number; label?: string };
 
     const allClips = [
       ...videoClips.map((c: RawVideo) => ({
         clipType: "video" as ClipType,
         startSec: c.start,
         endSec: c.end,
-        url: c.url ?? null,
+        mediaUrl: c.mediaUrl ?? null,
         label: c.label ?? "",
       })),
       ...subtitleClips.map((c: RawSubtitle) => ({

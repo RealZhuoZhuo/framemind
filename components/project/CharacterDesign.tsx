@@ -22,15 +22,19 @@ function EditCharacterModal({
   const [form, setForm] = useState<EditFields>(initial);
 
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const set = (key: keyof EditFields, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const handleSave = async () => {
     setLoading(true);
+    setErrorMessage("");
     try {
       await onSave(form);
       onClose();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "保存失败");
     } finally {
       setLoading(false);
     }
@@ -110,6 +114,11 @@ function EditCharacterModal({
 
         {/* Footer */}
         <div className="absolute inset-x-0 bottom-0 flex justify-end gap-3 border-t border-white/8 bg-[#161616] px-7 py-4">
+          {errorMessage ? (
+            <div className="mr-auto flex items-center rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {errorMessage}
+            </div>
+          ) : null}
           <button
             onClick={onClose}
             className="h-9 rounded-lg px-5 text-sm text-white/40 hover:text-white/60 transition-colors"

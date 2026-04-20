@@ -1,5 +1,5 @@
-import { stepRepo } from "@/lib/repositories";
-import { ok, serverError } from "@/app/api/_helpers/api-response";
+import { projectRepo, stepRepo } from "@/lib/repositories";
+import { ok, notFound, serverError } from "@/app/api/_helpers/api-response";
 
 export async function GET(
   _request: Request,
@@ -7,6 +7,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const project = await projectRepo.findById(id);
+    if (!project) return notFound("Project not found");
     const steps = await stepRepo.findByProject(id);
     return ok(steps);
   } catch (e) {

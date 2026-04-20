@@ -4,7 +4,7 @@ export type VideoClip = {
   id: string;
   start: number;
   end: number;
-  url: string;
+  mediaUrl: string;
   label: string;
 };
 
@@ -46,27 +46,27 @@ const DURATION = 30; // 5 clips × 5 s + 5 s tail room
 const defaultVideoClips: VideoClip[] = [
   {
     id: "v1", start: 0,  end: 5,
-    url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=80",
     label: "镜头 1",
   },
   {
     id: "v2", start: 5,  end: 10,
-    url: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80",
     label: "镜头 2",
   },
   {
     id: "v3", start: 10, end: 15,
-    url: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80",
     label: "镜头 3",
   },
   {
     id: "v4", start: 15, end: 20,
-    url: "https://images.unsplash.com/photo-1543286386-713bdd548da4?w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1543286386-713bdd548da4?w=800&q=80",
     label: "镜头 4",
   },
   {
     id: "v5", start: 20, end: 25,
-    url: "https://images.unsplash.com/photo-1529927066849-79b791a69825?w=800&q=80",
+    mediaUrl: "https://images.unsplash.com/photo-1529927066849-79b791a69825?w=800&q=80",
     label: "镜头 5",
   },
 ];
