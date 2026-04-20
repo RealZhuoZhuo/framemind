@@ -12,11 +12,7 @@ export type Character = {
 };
 
 const BORDER_COLORS = [
-  { borderColor: "border-yellow-500/60", gradientFrom: "from-yellow-900/30" },
-  { borderColor: "border-green-500/60",  gradientFrom: "from-green-900/30"  },
-  { borderColor: "border-purple-500/60", gradientFrom: "from-purple-900/30" },
-  { borderColor: "border-blue-500/60",   gradientFrom: "from-blue-900/30"   },
-  { borderColor: "border-rose-500/60",   gradientFrom: "from-rose-900/30"   },
+  { borderColor: "border-green-500/50", gradientFrom: "from-green-900/25" },
 ];
 
 function assignStyle(idx: number) {
