@@ -6,12 +6,14 @@ export interface ICharacterRepository {
   create(projectId: string, data: CreateCharacterInput): Promise<CharacterRow>;
   update(id: string, data: UpdateCharacterInput): Promise<CharacterRow | null>;
   delete(id: string): Promise<void>;
+  deleteByProject(projectId: string): Promise<void>;
 }
 
 export type CreateCharacterInput = {
   name: string;
   appearance?: string;
   description?: string;
+  mediaUrl?: string | null;
 };
 
 export type UpdateCharacterInput = Partial<CreateCharacterInput>;

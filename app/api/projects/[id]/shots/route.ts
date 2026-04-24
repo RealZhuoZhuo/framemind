@@ -30,11 +30,11 @@ export async function POST(
     const shot = await shotRepo.create(id, {
       shotNumber,
       sceneType,
-      characterId,
+      characterId: characterId || null,
       dialogue,
       characterAction,
       lightingMood,
-      mediaUrl,
+      mediaUrl: mediaUrl ?? null,
     });
     return created(shot);
   } catch (e) {

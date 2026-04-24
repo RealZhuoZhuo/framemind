@@ -21,6 +21,7 @@ export async function PATCH(
     }
     if (body.appearance !== undefined) patch.appearance = String(body.appearance);
     if (body.description !== undefined) patch.description = String(body.description);
+    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
 
     const updated = await characterRepo.update(cid, patch);
     if (!updated) return notFound("Character not found");

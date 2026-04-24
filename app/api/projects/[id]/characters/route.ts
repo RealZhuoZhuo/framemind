@@ -25,11 +25,11 @@ export async function POST(
     const project = await projectRepo.findById(id);
     if (!project) return notFound("Project not found");
     const body = await request.json();
-    const { name, appearance, description } = body;
+    const { name, appearance, description, mediaUrl } = body;
 
     if (!name || typeof name !== "string") return badRequest("name is required");
 
-    const character = await characterRepo.create(id, { name, appearance, description });
+    const character = await characterRepo.create(id, { name, appearance, description, mediaUrl });
     return created(character);
   } catch (e) {
     return serverError(e);

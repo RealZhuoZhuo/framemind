@@ -67,4 +67,9 @@ export class ShotPostgresRepository implements IShotRepository {
     await ensureDatabaseSchema();
     await db.delete(shots).where(eq(shots.id, id));
   }
+
+  async deleteByProject(projectId: string): Promise<void> {
+    await ensureDatabaseSchema();
+    await db.delete(shots).where(eq(shots.projectId, projectId));
+  }
 }

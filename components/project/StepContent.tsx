@@ -137,7 +137,7 @@ function UploadModal({
 }
 
 export default function StepContent() {
-  const { activeStep, steps, setContent, nextStep, canGoNext, sidebarCollapsed, toggleSidebar } = useProjectStore();
+  const { activeStep, steps, setContent, nextStep, canGoNext, sidebarCollapsed, toggleSidebar, isTransitioning, transitionError } = useProjectStore();
   const step = STEPS.find((s) => s.key === activeStep)!;
   const [showUpload, setShowUpload] = useState(false);
 
@@ -162,17 +162,24 @@ export default function StepContent() {
           {activeStep === "script" && (
             <button
               onClick={() => setShowUpload(true)}
+              disabled={isTransitioning}
               className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] text-white/50 hover:border-white/20 hover:bg-white/8 hover:text-white/70 transition-all"
             >
               <Upload className="h-3 w-3" />
               上传剧本
             </button>
           )}
-          <Button size="sm" onClick={nextStep} disabled={!canGoNext()} className="h-7 px-5 text-xs font-semibold">
-            下一步
+          <Button size="sm" onClick={() => { nextStep(); }} disabled={!canGoNext() || isTransitioning} className="h-7 px-5 text-xs font-semibold">
+            {isTransitioning ? "处理中…" : "下一步"}
           </Button>
         </div>
       </div>
+
+      {transitionError ? (
+        <div className="mx-8 mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          {transitionError}
+        </div>
+      ) : null}
 
       {/* Content */}
       <div className="flex-1 overflow-auto px-8 pb-8">

@@ -23,7 +23,7 @@ export async function PATCH(
     if (body.dialogue !== undefined) patch.dialogue = String(body.dialogue);
     if (body.characterAction !== undefined) patch.characterAction = String(body.characterAction);
     if (body.lightingMood !== undefined) patch.lightingMood = String(body.lightingMood);
-    if ("characterId" in body) patch.characterId = body.characterId ?? null;
+    if ("characterId" in body) patch.characterId = body.characterId || null;
     if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
 
     const updated = await shotRepo.update(sid, patch);

@@ -32,6 +32,7 @@ export class CharacterPostgresRepository implements ICharacterRepository {
         name: data.name,
         appearance: data.appearance ?? "",
         description: data.description ?? "",
+        mediaUrl: data.mediaUrl ?? null,
       })
       .returning();
     return rows[0];
@@ -50,5 +51,10 @@ export class CharacterPostgresRepository implements ICharacterRepository {
   async delete(id: string): Promise<void> {
     await ensureDatabaseSchema();
     await db.delete(characters).where(eq(characters.id, id));
+  }
+
+  async deleteByProject(projectId: string): Promise<void> {
+    await ensureDatabaseSchema();
+    await db.delete(characters).where(eq(characters.projectId, projectId));
   }
 }

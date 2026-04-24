@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useCharacterStore } from "./useCharacterStore";
+import { useStoryboardStore } from "./useStoryboardStore";
 
 export type StepKey = "script" | "character" | "storyboard" | "video";
 
@@ -17,9 +19,11 @@ type StepState = {
 type ProjectStore = {
   projectId: string | null;
   isLoading: boolean;
+  isTransitioning: boolean;
   activeStep: StepKey;
   steps: Record<StepKey, StepState>;
   sidebarCollapsed: boolean;
+  transitionError: string;
 
   init: (projectId: string) => Promise<void>;
   setActiveStep: (step: StepKey) => void;
@@ -74,15 +78,35 @@ function saveProject(projectId: string, data: { script?: string }) {
   }).catch(console.error);
 }
 
+async function saveStepOrThrow(projectId: string, stepKey: StepKey, data: { content?: string; completed?: boolean }) {
+  const res = await fetch(`/api/projects/${projectId}/steps/${stepKey}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  await readJsonOrThrow(res);
+}
+
+async function saveProjectOrThrow(projectId: string, data: { script?: string }) {
+  const res = await fetch(`/api/projects/${projectId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  await readJsonOrThrow(res);
+}
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   projectId: null,
   isLoading: false,
+  isTransitioning: false,
   activeStep: "script",
   steps: { ...initial },
   sidebarCollapsed: false,
+  transitionError: "",
 
   init: async (projectId) => {
-    set({ projectId, isLoading: true, steps: { ...initial }, activeStep: "script" });
+    set({ projectId, isLoading: true, isTransitioning: false, transitionError: "", steps: { ...initial }, activeStep: "script" });
     try {
       const res = await fetch(`/api/projects/${projectId}/steps`);
       const rows = await readJsonOrThrow<{ stepKey: StepKey; completed: boolean; content: string }[]>(res);
@@ -105,6 +129,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   setActiveStep: (step) => {
+    if (get().isTransitioning) return;
     if (!get().canAccess(step)) return;
     set({ activeStep: step });
   },
@@ -120,6 +145,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (_contentTimers[step]) clearTimeout(_contentTimers[step]);
     _contentTimers[step] = setTimeout(() => {
       saveStep(projectId, step, { content });
+      if (step === "script") {
+        saveProject(projectId, { script: content });
+      }
     }, 1000);
   },
 
@@ -130,25 +158,39 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   nextStep: async () => {
     const { activeStep, steps, projectId } = get();
+    if (!projectId || get().isTransitioning) return;
     const idx = STEPS.findIndex((s) => s.key === activeStep);
-    if (idx < STEPS.length - 1) {
-      const next = STEPS[idx + 1].key;
+    if (idx >= STEPS.length - 1) return;
+
+    const next = STEPS[idx + 1].key;
+    set({ isTransitioning: true, transitionError: "" });
+
+    try {
+      await saveStepOrThrow(projectId, activeStep, {
+        completed: true,
+        content: steps[activeStep].content,
+      });
+
+      if (activeStep === "script") {
+        await saveProjectOrThrow(projectId, { script: steps.script.content });
+        await useCharacterStore.getState().generateCharacters(projectId);
+      } else if (activeStep === "character") {
+        await useStoryboardStore.getState().generateShots(projectId);
+      }
+
       set((s) => ({
+        isTransitioning: false,
         activeStep: next,
         steps: {
           ...s.steps,
           [activeStep]: { ...s.steps[activeStep], completed: true },
         },
       }));
-      if (projectId) {
-        saveStep(projectId, activeStep, {
-          completed: true,
-          content: steps[activeStep].content,
-        });
-        if (activeStep === "script") {
-          saveProject(projectId, { script: steps.script.content });
-        }
-      }
+    } catch (error) {
+      set({
+        isTransitioning: false,
+        transitionError: error instanceof Error ? error.message : "处理失败",
+      });
     }
   },
 

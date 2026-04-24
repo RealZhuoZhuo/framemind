@@ -6,6 +6,7 @@ export interface IShotRepository {
   create(projectId: string, data: CreateShotInput): Promise<ShotRow>;
   update(id: string, data: UpdateShotInput): Promise<ShotRow | null>;
   delete(id: string): Promise<void>;
+  deleteByProject(projectId: string): Promise<void>;
 }
 
 export type CreateShotInput = {

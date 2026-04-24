@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
-import { Plus, Mic, UserCircle2, MoreHorizontal, Play, Download, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Mic, UserCircle2, MoreHorizontal, Play, Download, Pencil, Trash2, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCharacterStore, type Character } from "@/store/useCharacterStore";
 
@@ -261,9 +261,10 @@ function AddCard({ onClick }: { onClick: () => void }) {
 
 export default function CharacterDesign() {
   const projectId = useProjectStore((s) => s.projectId);
-  const { characters, isLoading, init, addCharacter, updateCharacter, removeCharacter } = useCharacterStore();
+  const { characters, isLoading, init, addCharacter, updateCharacter, removeCharacter, generateCharacters } = useCharacterStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [generateError, setGenerateError] = useState("");
 
   useEffect(() => {
     if (projectId) init(projectId);
@@ -271,7 +272,17 @@ export default function CharacterDesign() {
 
   const editingChar = characters.find((c) => c.id === editingId) ?? null;
 
-  if (isLoading) {
+  const handleGenerateCharacters = async () => {
+    if (!projectId) return;
+    setGenerateError("");
+    try {
+      await generateCharacters(projectId);
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : "角色生成失败");
+    }
+  };
+
+  if (isLoading && characters.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center">
         <span className="text-sm text-white/30">加载中…</span>
@@ -281,6 +292,24 @@ export default function CharacterDesign() {
 
   return (
     <>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="text-xs text-white/35">基于已保存剧本自动提取角色，并写入当前角色字段。</div>
+        <button
+          onClick={() => { handleGenerateCharacters(); }}
+          disabled={!projectId || isLoading}
+          className="flex h-9 items-center gap-2 rounded-lg bg-green-500/15 px-4 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-40"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {isLoading ? "生成中…" : "AI生成角色"}
+        </button>
+      </div>
+
+      {generateError ? (
+        <div className="mb-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          {generateError}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-4 gap-4">
         {characters.map((c) => (
           <CharacterCard

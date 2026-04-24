@@ -5,6 +5,7 @@ export type Character = {
   name: string;
   appearance: string;
   description: string;
+  mediaUrl: string | null;
   // UI-only, assigned by index on load
   borderColor: string;
   gradientFrom: string;
@@ -40,9 +41,10 @@ type CharacterStore = {
   isLoading: boolean;
   characters: Character[];
   init: (projectId: string) => Promise<void>;
-  addCharacter: (projectId: string, data?: { name?: string; appearance?: string; description?: string }) => Promise<void>;
-  updateCharacter: (id: string, data: Partial<Pick<Character, "name" | "appearance" | "description">>) => Promise<void>;
+  addCharacter: (projectId: string, data?: { name?: string; appearance?: string; description?: string; mediaUrl?: string | null }) => Promise<void>;
+  updateCharacter: (id: string, data: Partial<Pick<Character, "name" | "appearance" | "description" | "mediaUrl">>) => Promise<void>;
   removeCharacter: (id: string) => Promise<void>;
+  generateCharacters: (projectId: string) => Promise<void>;
 };
 
 export const useCharacterStore = create<CharacterStore>((set, get) => ({
@@ -54,7 +56,7 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     set({ projectId, isLoading: true, characters: [] });
     try {
       const res = await fetch(`/api/projects/${projectId}/characters`);
-      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string }[]>(res);
+      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string; mediaUrl: string | null }[]>(res);
       if (!Array.isArray(rows)) {
         throw new Error("Invalid characters payload");
       }
@@ -70,9 +72,9 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     const res = await fetch(`/api/projects/${projectId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: data?.name || "新角色", appearance: data?.appearance, description: data?.description }),
+      body: JSON.stringify({ name: data?.name || "新角色", appearance: data?.appearance, description: data?.description, mediaUrl: data?.mediaUrl }),
     });
-    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string }>(res);
+    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string; mediaUrl: string | null }>(res);
     set((s) => ({
       characters: [...s.characters, { ...row, ...assignStyle(s.characters.length) }],
     }));
@@ -101,5 +103,20 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     await fetch(`/api/projects/${projectId}/characters/${id}`, {
       method: "DELETE",
     }).catch(console.error);
+  },
+
+  generateCharacters: async (projectId) => {
+    set({ isLoading: true });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/characters/generate`, {
+        method: "POST",
+      });
+      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string; mediaUrl: string | null }[]>(res);
+      const characters: Character[] = rows.map((row, index) => ({ ...row, ...assignStyle(index) }));
+      set({ characters, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
   },
 }));

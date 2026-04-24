@@ -1,53 +1,89 @@
 import { create } from "zustand";
+import type { SceneType } from "@/lib/storyboard/constants";
 
-export const SCENE_TYPES = ["特写", "近景", "中景", "远景", "全景"] as const;
-
-export type SceneType = (typeof SCENE_TYPES)[number] | "";
+export { SCENE_TYPES } from "@/lib/storyboard/constants";
+export type { SceneType } from "@/lib/storyboard/constants";
 
 export type Shot = {
   id: string;
   shotNumber: number;
   sceneType: SceneType;
-  characterId: string;
+  characterId: string | null;
   dialogue: string;
   characterAction: string;
   lightingMood: string;
-  mediaUrl: string;
+  mediaUrl: string | null;
 };
+
+async function readJsonOrThrow<T>(res: Response): Promise<T> {
+  const payload = await res.json();
+
+  if (!res.ok) {
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Request failed";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
 
 type StoryboardStore = {
+  projectId: string | null;
+  isLoading: boolean;
   shots: Shot[];
-  updateShot: (id: string, patch: Partial<Shot>) => void;
+  init: (projectId: string) => Promise<void>;
+  updateShot: (id: string, patch: Partial<Shot>) => Promise<void>;
+  generateShots: (projectId: string) => Promise<void>;
 };
 
-const defaultShots: Shot[] = [
-  {
-    id: "1",
-    shotNumber: 1,
-    sceneType: "特写",
-    characterId: "2",
-    dialogue: "先别开口，让我想清楚。",
-    characterAction: "手指悬停在键盘上，短暂停顿后按下回车，肩膀紧绷。",
-    lightingMood: "冷蓝屏幕光打在脸上，环境压暗，轻微霓虹反光。",
-    mediaUrl: "demo-shot-1",
-  },
-  {
-    id: "2",
-    shotNumber: 2,
-    sceneType: "中景",
-    characterId: "1",
-    dialogue: "现在没有退路了。",
-    characterAction: "人物从椅子上猛地起身，转头看向门口，呼吸急促。",
-    lightingMood: "顶光偏硬，背景留有暗部，空气里有压迫感。",
-    mediaUrl: "",
-  },
-];
+export const useStoryboardStore = create<StoryboardStore>((set, get) => ({
+  projectId: null,
+  isLoading: false,
+  shots: [],
 
-export const useStoryboardStore = create<StoryboardStore>((set) => ({
-  shots: defaultShots,
+  init: async (projectId) => {
+    set({ projectId, isLoading: true, shots: [] });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/shots`);
+      const rows = await readJsonOrThrow<Shot[]>(res);
+      set({ shots: rows, isLoading: false });
+    } catch (error) {
+      console.error("Failed to load storyboard shots:", error);
+      set({ isLoading: false });
+    }
+  },
 
-  updateShot: (id, patch) =>
-    set((s) => ({
-      shots: s.shots.map((sh) => (sh.id === id ? { ...sh, ...patch } : sh)),
-    })),
+  updateShot: async (id, patch) => {
+    const { projectId } = get();
+    if (!projectId) return;
+
+    set((state) => ({
+      shots: state.shots.map((shot) => (shot.id === id ? { ...shot, ...patch } : shot)),
+    }));
+
+    await fetch(`/api/projects/${projectId}/shots/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }).catch(console.error);
+  },
+
+  generateShots: async (projectId) => {
+    set({ isLoading: true });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/shots/generate`, {
+        method: "POST",
+      });
+      const rows = await readJsonOrThrow<Shot[]>(res);
+      set({ shots: rows, isLoading: false });
+    } catch (error) {
+      set({ isLoading: false });
+      throw error;
+    }
+  },
 }));
