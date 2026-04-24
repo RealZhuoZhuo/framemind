@@ -4,7 +4,6 @@ import { SCENE_TYPES } from "@/lib/storyboard/constants";
 function serializeCharactersForPrompt(characters: CharacterRow[]) {
   return JSON.stringify(
     characters.map((character) => ({
-      id: character.id,
       name: character.name,
       appearance: character.appearance,
       description: character.description,
@@ -39,14 +38,13 @@ export function getCharacterExtractionUserPrompt(chunk: string, index: number, t
 export function getShotGenerationSystemPrompt() {
   return [
     "你是影视分镜导演。",
-    "你的任务是把剧本转成数据库可写的分镜镜头数组。",
-    "每个镜头只允许包含：shotNumber、sceneType、characterId、dialogue、characterAction、lightingMood、mediaUrl。",
+    "你的任务是把剧本转成可写入数据库的分镜镜头草稿数组。",
+    "每个镜头只允许包含：sceneType、characterName、dialogue、characterAction、lightingMood。",
     `sceneType 只能使用这些值之一：${SCENE_TYPES.join("、")}，如果无法判断就输出空字符串。`,
-    "characterId 必须直接从提供的角色列表中选择一个真实 id；如果该镜头没有明确主角色，则输出 null。",
+    "characterName 必须直接从提供的角色列表中选择一个真实角色名；如果该镜头没有明确主角色，则输出 null。",
     "dialogue 只写当前镜头里最核心的台词内容，没有则输出空字符串。",
     "characterAction 要承担画面描述职责，写清楚人物动作、环境构成、构图重点和镜头主体。",
     "lightingMood 写灯光、色调、氛围和情绪信息。",
-    "mediaUrl 一律输出空字符串。",
     "不要输出额外字段，不要解释。",
   ].join("\n");
 }
@@ -55,15 +53,13 @@ export function getShotGenerationUserPrompt(params: {
   chunk: string;
   index: number;
   total: number;
-  startShotNumber: number;
   characters: CharacterRow[];
 }) {
-  const { chunk, index, total, startShotNumber, characters } = params;
+  const { chunk, index, total, characters } = params;
 
   return [
     `本次需要生成剧本分段 ${index + 1}/${total} 的镜头。`,
-    `镜头序号从 ${startShotNumber} 开始递增。`,
-    "下面是可选角色列表（只能引用这些角色 id）：",
+    "下面是可选角色列表（只能引用这些角色名）：",
     serializeCharactersForPrompt(characters),
     "",
     "剧本内容：",

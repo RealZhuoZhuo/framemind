@@ -2,6 +2,35 @@ function cleanParagraph(paragraph: string) {
   return paragraph.replace(/\s+/g, " ").trim();
 }
 
+function splitOversizedParagraph(paragraph: string, maxChars: number) {
+  const parts: string[] = [];
+  let remaining = paragraph.trim();
+
+  while (remaining.length > maxChars) {
+    const candidate = remaining.slice(0, maxChars + 1);
+    const breakpoints = ["\n", "。", "！", "？", "；", ";", "，", ",", " "];
+    let splitAt = -1;
+
+    for (const breakpoint of breakpoints) {
+      splitAt = Math.max(splitAt, candidate.lastIndexOf(breakpoint));
+    }
+
+    if (splitAt < Math.floor(maxChars * 0.5)) {
+      splitAt = maxChars;
+    }
+
+    const next = remaining.slice(0, splitAt).trim();
+    if (next) parts.push(next);
+    remaining = remaining.slice(splitAt).trim();
+  }
+
+  if (remaining) {
+    parts.push(remaining);
+  }
+
+  return parts;
+}
+
 export function splitScriptIntoChunks(script: string, maxChars = 6000) {
   const normalized = script.replace(/\r\n/g, "\n").trim();
   if (!normalized) return [];
@@ -10,7 +39,8 @@ export function splitScriptIntoChunks(script: string, maxChars = 6000) {
   const paragraphs = normalized
     .split(/\n{2,}/)
     .map(cleanParagraph)
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((paragraph) => splitOversizedParagraph(paragraph, maxChars));
 
   const chunks: string[] = [];
   let current = "";

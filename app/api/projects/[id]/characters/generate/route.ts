@@ -1,3 +1,4 @@
+import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
 import { extractCharactersFromScript } from "@/lib/ai/story-pipeline";
 import { getProjectScript } from "@/lib/ai/project-script";
@@ -31,6 +32,9 @@ export async function POST(
 
     return ok(characters);
   } catch (e) {
+    if (NoOutputGeneratedError.isInstance(e)) {
+      return badRequest("AI did not return valid structured character data. Retry or simplify the script content.");
+    }
     return serverError(e);
   }
 }

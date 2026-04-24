@@ -1,3 +1,4 @@
+import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
 import { getProjectScript } from "@/lib/ai/project-script";
 import { generateShotsFromScript } from "@/lib/ai/story-pipeline";
@@ -36,6 +37,9 @@ export async function POST(
 
     return ok(shots);
   } catch (e) {
+    if (NoOutputGeneratedError.isInstance(e)) {
+      return badRequest("AI did not return valid structured storyboard data. Retry or simplify the script content.");
+    }
     return serverError(e);
   }
 }
