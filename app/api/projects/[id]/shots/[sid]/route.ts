@@ -19,18 +19,12 @@ export async function PATCH(
       if (typeof body.shotNumber !== "number") return badRequest("shotNumber must be a number");
       patch.shotNumber = body.shotNumber;
     }
-    if (body.description !== undefined) patch.description = String(body.description);
     if (body.sceneType !== undefined) patch.sceneType = String(body.sceneType);
-    if (body.cameraAngle !== undefined) patch.cameraAngle = String(body.cameraAngle);
-    if (body.narration !== undefined) patch.narration = String(body.narration);
     if (body.dialogue !== undefined) patch.dialogue = String(body.dialogue);
-    if (body.notes !== undefined) patch.notes = String(body.notes);
+    if (body.characterAction !== undefined) patch.characterAction = String(body.characterAction);
+    if (body.lightingMood !== undefined) patch.lightingMood = String(body.lightingMood);
     if ("characterId" in body) patch.characterId = body.characterId ?? null;
-    if (body.imageGenerated !== undefined) {
-      if (typeof body.imageGenerated !== "boolean") return badRequest("imageGenerated must be a boolean");
-      patch.imageGenerated = body.imageGenerated;
-    }
-    if ("imageUrl" in body) patch.imageUrl = body.imageUrl ?? null;
+    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
 
     const updated = await shotRepo.update(sid, patch);
     if (!updated) return notFound("Shot not found");

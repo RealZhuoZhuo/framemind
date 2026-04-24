@@ -10,6 +10,7 @@ export interface IProjectRepository {
 
 export type CreateProjectInput = {
   title?: string;
+  script?: string;
   videoMode?: string;
   aspectRatio?: string;
   visualStyle?: string;
@@ -17,6 +18,7 @@ export type CreateProjectInput = {
 
 export type UpdateProjectInput = Partial<{
   title: string;
+  script: string;
   videoMode: string;
   aspectRatio: string;
   visualStyle: string;

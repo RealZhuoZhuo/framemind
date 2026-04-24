@@ -13,9 +13,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, videoMode, aspectRatio, visualStyle } = body;
+    const { title, script, videoMode, aspectRatio, visualStyle } = body;
 
-    const project = await projectRepo.create({ title, videoMode, aspectRatio, visualStyle });
+    const project = await projectRepo.create({ title, script, videoMode, aspectRatio, visualStyle });
     await stepRepo.initForProject(project.id);
     return created(project);
   } catch (e) {

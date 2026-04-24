@@ -42,15 +42,12 @@ export class ShotPostgresRepository implements IShotRepository {
         id: randomUUID(),
         projectId,
         shotNumber,
-        description: data.description ?? "",
         sceneType: data.sceneType ?? "",
-        cameraAngle: data.cameraAngle ?? "",
-        narration: data.narration ?? "",
         characterId: data.characterId ?? null,
         dialogue: data.dialogue ?? "",
-        notes: data.notes ?? "",
-        mediaGenerated: false,
-        mediaUrl: null,
+        characterAction: data.characterAction ?? "",
+        lightingMood: data.lightingMood ?? "",
+        mediaUrl: data.mediaUrl ?? null,
       })
       .returning();
     return rows[0];

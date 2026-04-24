@@ -10,18 +10,12 @@ export interface IShotRepository {
 
 export type CreateShotInput = {
   shotNumber?: number;
-  description?: string;
   sceneType?: string;
-  cameraAngle?: string;
-  narration?: string;
   characterId?: string | null;
   dialogue?: string;
-  notes?: string;
+  characterAction?: string;
+  lightingMood?: string;
+  mediaUrl?: string | null;
 };
 
-export type UpdateShotInput = Partial<
-  CreateShotInput & {
-    imageGenerated: boolean;
-    imageUrl: string | null;
-  }
->;
+export type UpdateShotInput = Partial<CreateShotInput>;

@@ -31,7 +31,6 @@ export class CharacterPostgresRepository implements ICharacterRepository {
         projectId,
         name: data.name,
         appearance: data.appearance ?? "",
-        clothing: data.clothing ?? "",
         description: data.description ?? "",
       })
       .returning();

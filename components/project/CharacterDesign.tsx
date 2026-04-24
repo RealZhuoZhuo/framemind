@@ -8,7 +8,7 @@ import { useCharacterStore, type Character } from "@/store/useCharacterStore";
 
 // ─── Edit Modal ────────────────────────────────────────────────────────────────
 
-type EditFields = Pick<Character, "name" | "appearance" | "clothing" | "description">;
+type EditFields = Pick<Character, "name" | "appearance" | "description">;
 
 function EditCharacterModal({
   initial,
@@ -86,16 +86,6 @@ function EditCharacterModal({
                 rows={3}
                 value={form.appearance}
                 onChange={(e) => set("appearance", e.target.value)}
-                className={textareaCls}
-              />
-            </Field>
-
-            {/* 穿着 */}
-            <Field label="穿着">
-              <textarea
-                rows={3}
-                value={form.clothing}
-                onChange={(e) => set("clothing", e.target.value)}
                 className={textareaCls}
               />
             </Field>
@@ -306,7 +296,7 @@ export default function CharacterDesign() {
       {/* Add modal */}
       {adding && (
         <EditCharacterModal
-          initial={{ name: "", appearance: "", clothing: "", description: "" }}
+          initial={{ name: "", appearance: "", description: "" }}
           onClose={() => setAdding(false)}
           onSave={async (data) => {
             if (projectId) await addCharacter(projectId, data);
@@ -321,7 +311,6 @@ export default function CharacterDesign() {
           initial={{
             name: editingChar.name,
             appearance: editingChar.appearance,
-            clothing: editingChar.clothing,
             description: editingChar.description,
           }}
           onClose={() => setEditingId(null)}

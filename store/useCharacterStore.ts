@@ -4,7 +4,6 @@ export type Character = {
   id: string;
   name: string;
   appearance: string;
-  clothing: string;
   description: string;
   // UI-only, assigned by index on load
   borderColor: string;
@@ -41,8 +40,8 @@ type CharacterStore = {
   isLoading: boolean;
   characters: Character[];
   init: (projectId: string) => Promise<void>;
-  addCharacter: (projectId: string, data?: { name?: string; appearance?: string; clothing?: string; description?: string }) => Promise<void>;
-  updateCharacter: (id: string, data: Partial<Pick<Character, "name" | "appearance" | "clothing" | "description">>) => Promise<void>;
+  addCharacter: (projectId: string, data?: { name?: string; appearance?: string; description?: string }) => Promise<void>;
+  updateCharacter: (id: string, data: Partial<Pick<Character, "name" | "appearance" | "description">>) => Promise<void>;
   removeCharacter: (id: string) => Promise<void>;
 };
 
@@ -55,7 +54,7 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     set({ projectId, isLoading: true, characters: [] });
     try {
       const res = await fetch(`/api/projects/${projectId}/characters`);
-      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; clothing: string; description: string }[]>(res);
+      const rows = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string }[]>(res);
       if (!Array.isArray(rows)) {
         throw new Error("Invalid characters payload");
       }
@@ -71,9 +70,9 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
     const res = await fetch(`/api/projects/${projectId}/characters`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: data?.name || "新角色", appearance: data?.appearance, clothing: data?.clothing, description: data?.description }),
+      body: JSON.stringify({ name: data?.name || "新角色", appearance: data?.appearance, description: data?.description }),
     });
-    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; clothing: string; description: string }>(res);
+    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string }>(res);
     set((s) => ({
       characters: [...s.characters, { ...row, ...assignStyle(s.characters.length) }],
     }));

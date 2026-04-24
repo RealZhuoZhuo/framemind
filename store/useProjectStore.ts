@@ -25,7 +25,7 @@ type ProjectStore = {
   setActiveStep: (step: StepKey) => void;
   setContent: (step: StepKey, content: string) => void;
   markCompleted: (step: StepKey) => void;
-  nextStep: () => void;
+  nextStep: () => Promise<void>;
   canGoNext: () => boolean;
   canAccess: (step: StepKey) => boolean;
   toggleSidebar: () => void;
@@ -60,6 +60,14 @@ async function readJsonOrThrow<T>(res: Response): Promise<T> {
 
 function saveStep(projectId: string, stepKey: StepKey, data: { content?: string; completed?: boolean }) {
   fetch(`/api/projects/${projectId}/steps/${stepKey}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch(console.error);
+}
+
+function saveProject(projectId: string, data: { script?: string }) {
+  fetch(`/api/projects/${projectId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -120,7 +128,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       steps: { ...s.steps, [step]: { ...s.steps[step], completed: true } },
     })),
 
-  nextStep: () => {
+  nextStep: async () => {
     const { activeStep, steps, projectId } = get();
     const idx = STEPS.findIndex((s) => s.key === activeStep);
     if (idx < STEPS.length - 1) {
@@ -137,6 +145,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           completed: true,
           content: steps[activeStep].content,
         });
+        if (activeStep === "script") {
+          saveProject(projectId, { script: steps.script.content });
+        }
       }
     }
   },

@@ -16,6 +16,7 @@ export const projects = pgTable(
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     title: text("title").notNull().default("未命名"),
+    script: text("script").notNull().default(""),
     videoMode: text("video_mode"),   // 'drama' | 'narration' | 'talking-head'
     aspectRatio: text("aspect_ratio"), // '16:9' | '9:16' | '1:1'
     visualStyle: text("visual_style"), // 'realistic' | '3d-animation' | 'japanese-anime'
@@ -51,7 +52,6 @@ export const characters = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     appearance: text("appearance").notNull().default(""),
-    clothing: text("clothing").notNull().default(""),
     description: text("description").notNull().default(""),
     mediaUrl: text("media_url"),
   },
@@ -66,14 +66,11 @@ export const shots = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     shotNumber: integer("shot_number").notNull(),
-    description: text("description").notNull().default(""),
     sceneType: text("scene_type").notNull().default(""),
-    cameraAngle: text("camera_angle").notNull().default(""),
-    narration: text("narration").notNull().default(""),
     characterId: uuid("character_id").references(() => characters.id, { onDelete: "set null" }),
     dialogue: text("dialogue").notNull().default(""),
-    notes: text("notes").notNull().default(""),
-    mediaGenerated: boolean("media_generated").notNull().default(false),
+    characterAction: text("character_action").notNull().default(""),
+    lightingMood: text("lighting_mood").notNull().default(""),
     mediaUrl: text("media_url"),
   },
   (table) => [

@@ -30,6 +30,7 @@ export class ProjectPostgresRepository implements IProjectRepository {
       .values({
         id: randomUUID(),
         title: data.title ?? "未命名",
+        script: data.script ?? "",
         videoMode: data.videoMode,
         aspectRatio: data.aspectRatio,
         visualStyle: data.visualStyle,

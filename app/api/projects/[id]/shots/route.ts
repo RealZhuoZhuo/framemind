@@ -21,7 +21,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { shotNumber, description, sceneType, cameraAngle, narration, characterId, dialogue, notes } = body;
+    const { shotNumber, sceneType, characterId, dialogue, characterAction, lightingMood, mediaUrl } = body;
 
     if (shotNumber !== undefined && typeof shotNumber !== "number") {
       return badRequest("shotNumber must be a number");
@@ -29,13 +29,12 @@ export async function POST(
 
     const shot = await shotRepo.create(id, {
       shotNumber,
-      description,
       sceneType,
-      cameraAngle,
-      narration,
       characterId,
       dialogue,
-      notes,
+      characterAction,
+      lightingMood,
+      mediaUrl,
     });
     return created(shot);
   } catch (e) {

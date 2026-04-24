@@ -11,7 +11,6 @@ export interface ICharacterRepository {
 export type CreateCharacterInput = {
   name: string;
   appearance?: string;
-  clothing?: string;
   description?: string;
 };
 

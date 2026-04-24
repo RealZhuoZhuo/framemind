@@ -20,7 +20,6 @@ export async function PATCH(
       patch.name = body.name;
     }
     if (body.appearance !== undefined) patch.appearance = String(body.appearance);
-    if (body.clothing !== undefined) patch.clothing = String(body.clothing);
     if (body.description !== undefined) patch.description = String(body.description);
 
     const updated = await characterRepo.update(cid, patch);

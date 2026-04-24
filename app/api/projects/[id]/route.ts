@@ -64,9 +64,11 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { title } = body;
+    const patch: { title?: string; script?: string } = {};
+    if (body.title !== undefined) patch.title = String(body.title);
+    if (body.script !== undefined) patch.script = String(body.script);
 
-    const updated = await projectRepo.update(id, { title });
+    const updated = await projectRepo.update(id, patch);
     if (!updated) return notFound("Project not found");
     return ok(updated);
   } catch (e) {
