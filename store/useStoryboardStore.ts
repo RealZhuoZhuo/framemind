@@ -39,6 +39,7 @@ type StoryboardStore = {
   init: (projectId: string) => Promise<void>;
   updateShot: (id: string, patch: Partial<Shot>) => Promise<void>;
   generateShots: (projectId: string) => Promise<void>;
+  generateShotImage: (id: string) => Promise<void>;
 };
 
 export const useStoryboardStore = create<StoryboardStore>((set, get) => ({
@@ -85,5 +86,19 @@ export const useStoryboardStore = create<StoryboardStore>((set, get) => ({
       set({ isLoading: false });
       throw error;
     }
+  },
+
+  generateShotImage: async (id) => {
+    const { projectId } = get();
+    if (!projectId) return;
+
+    const res = await fetch(`/api/projects/${projectId}/shots/${id}/image`, {
+      method: "POST",
+    });
+    const row = await readJsonOrThrow<Shot>(res);
+
+    set((state) => ({
+      shots: state.shots.map((shot) => (shot.id === id ? row : shot)),
+    }));
   },
 }));

@@ -12,16 +12,21 @@ type EditFields = Pick<Character, "name" | "appearance" | "description">;
 
 function EditCharacterModal({
   initial,
+  mediaUrl,
   onClose,
   onSave,
+  onGenerateImage,
 }: {
   initial: EditFields;
+  mediaUrl?: string | null;
   onClose: () => void;
   onSave: (data: EditFields) => void | Promise<void>;
+  onGenerateImage?: (data: EditFields) => void | Promise<void>;
 }) {
   const [form, setForm] = useState<EditFields>(initial);
 
   const [loading, setLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const set = (key: keyof EditFields, value: string) =>
@@ -37,6 +42,19 @@ function EditCharacterModal({
       setErrorMessage(error instanceof Error ? error.message : "保存失败");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!onGenerateImage) return;
+    setImageLoading(true);
+    setErrorMessage("");
+    try {
+      await onGenerateImage(form);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "形象生成失败");
+    } finally {
+      setImageLoading(false);
     }
   };
 
@@ -61,10 +79,24 @@ function EditCharacterModal({
         <div className="flex w-full pt-[57px] pb-[61px] overflow-hidden">
           {/* Left: image preview — half width, full height */}
           <div className="relative flex w-1/2 shrink-0 flex-col items-center justify-center border-r border-white/8 bg-[#111]">
-            <UserCircle2 className="h-24 w-24 text-white/10" />
-            <span className="mt-3 text-[11px] text-white/25">请生成角色形象</span>
-            <button className="absolute bottom-6 rounded-lg bg-white/8 px-5 py-2 text-xs text-white/50 hover:bg-white/14 hover:text-white/70 transition-colors">
-              生成形象
+            {mediaUrl ? (
+              <img
+                src={mediaUrl}
+                alt={initial.name || "角色形象"}
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <>
+                <UserCircle2 className="h-24 w-24 text-white/10" />
+                <span className="mt-3 text-[11px] text-white/25">请生成角色形象</span>
+              </>
+            )}
+            <button
+              disabled={!onGenerateImage || imageLoading}
+              onClick={() => { handleGenerateImage(); }}
+              className="absolute bottom-6 rounded-lg bg-white/8 px-5 py-2 text-xs text-white/70 backdrop-blur hover:bg-white/14 hover:text-white disabled:opacity-40 transition-colors"
+            >
+              {imageLoading ? "生成中…" : "生成形象"}
             </button>
           </div>
 
@@ -197,8 +229,16 @@ function CharacterCard({
       </div>
 
       {/* Image area */}
-      <div className={cn("relative flex h-44 items-center justify-center bg-gradient-to-b", char.gradientFrom, "to-[#111]")}>
-        <UserCircle2 className="h-20 w-20 text-white/10" />
+      <div className={cn("relative flex h-56 items-center justify-center bg-gradient-to-b", char.gradientFrom, "to-[#111]")}>
+        {char.mediaUrl ? (
+          <img
+            src={char.mediaUrl}
+            alt={char.name}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <UserCircle2 className="h-20 w-20 text-white/10" />
+        )}
       </div>
 
       {/* Info */}
@@ -261,7 +301,7 @@ function AddCard({ onClick }: { onClick: () => void }) {
 
 export default function CharacterDesign() {
   const projectId = useProjectStore((s) => s.projectId);
-  const { characters, isLoading, init, addCharacter, updateCharacter, removeCharacter, generateCharacters } = useCharacterStore();
+  const { characters, isLoading, init, addCharacter, updateCharacter, removeCharacter, generateCharacters, generateCharacterImage } = useCharacterStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [generateError, setGenerateError] = useState("");
@@ -326,6 +366,7 @@ export default function CharacterDesign() {
       {adding && (
         <EditCharacterModal
           initial={{ name: "", appearance: "", description: "" }}
+          mediaUrl={null}
           onClose={() => setAdding(false)}
           onSave={async (data) => {
             if (projectId) await addCharacter(projectId, data);
@@ -342,8 +383,14 @@ export default function CharacterDesign() {
             appearance: editingChar.appearance,
             description: editingChar.description,
           }}
+          mediaUrl={editingChar.mediaUrl}
           onClose={() => setEditingId(null)}
-          onSave={(data) => updateCharacter(editingChar.id, data)}        />
+          onSave={(data) => updateCharacter(editingChar.id, data)}
+          onGenerateImage={async (data) => {
+            await updateCharacter(editingChar.id, data);
+            await generateCharacterImage(editingChar.id);
+          }}
+        />
       )}
     </>
   );

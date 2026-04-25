@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
-import { ensureDatabaseSchema } from "@/lib/db";
 import { shots } from "@/lib/db/schema";
 import { eq, max } from "drizzle-orm";
 import type {
@@ -12,7 +11,6 @@ import type { ShotRow } from "@/lib/db/types";
 
 export class ShotPostgresRepository implements IShotRepository {
   async findByProject(projectId: string): Promise<ShotRow[]> {
-    await ensureDatabaseSchema();
     return db
       .select()
       .from(shots)
@@ -21,13 +19,11 @@ export class ShotPostgresRepository implements IShotRepository {
   }
 
   async findById(id: string): Promise<ShotRow | null> {
-    await ensureDatabaseSchema();
     const rows = await db.select().from(shots).where(eq(shots.id, id));
     return rows[0] ?? null;
   }
 
   async create(projectId: string, data: CreateShotInput): Promise<ShotRow> {
-    await ensureDatabaseSchema();
     let shotNumber = data.shotNumber;
     if (shotNumber === undefined) {
       const [row] = await db
@@ -54,7 +50,6 @@ export class ShotPostgresRepository implements IShotRepository {
   }
 
   async update(id: string, data: UpdateShotInput): Promise<ShotRow | null> {
-    await ensureDatabaseSchema();
     const rows = await db
       .update(shots)
       .set(data)
@@ -64,12 +59,10 @@ export class ShotPostgresRepository implements IShotRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await ensureDatabaseSchema();
     await db.delete(shots).where(eq(shots.id, id));
   }
 
   async deleteByProject(projectId: string): Promise<void> {
-    await ensureDatabaseSchema();
     await db.delete(shots).where(eq(shots.projectId, projectId));
   }
 }

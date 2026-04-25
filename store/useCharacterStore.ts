@@ -45,6 +45,7 @@ type CharacterStore = {
   updateCharacter: (id: string, data: Partial<Pick<Character, "name" | "appearance" | "description" | "mediaUrl">>) => Promise<void>;
   removeCharacter: (id: string) => Promise<void>;
   generateCharacters: (projectId: string) => Promise<void>;
+  generateCharacterImage: (id: string) => Promise<void>;
 };
 
 export const useCharacterStore = create<CharacterStore>((set, get) => ({
@@ -118,5 +119,21 @@ export const useCharacterStore = create<CharacterStore>((set, get) => ({
       set({ isLoading: false });
       throw error;
     }
+  },
+
+  generateCharacterImage: async (id) => {
+    const { projectId } = get();
+    if (!projectId) return;
+
+    const res = await fetch(`/api/projects/${projectId}/characters/${id}/image`, {
+      method: "POST",
+    });
+    const row = await readJsonOrThrow<{ id: string; name: string; appearance: string; description: string; mediaUrl: string | null }>(res);
+
+    set((s) => ({
+      characters: s.characters.map((character) =>
+        character.id === id ? { ...character, ...row } : character
+      ),
+    }));
   },
 }));

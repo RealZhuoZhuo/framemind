@@ -1,5 +1,6 @@
 import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
+import { generateCharacterImageToStorage } from "@/lib/ai/character-image-generation";
 import { extractCharactersFromScript } from "@/lib/ai/story-pipeline";
 import { getProjectScript } from "@/lib/ai/project-script";
 import { characterRepo, projectRepo } from "@/lib/repositories";
@@ -27,7 +28,9 @@ export async function POST(
     const characters = [];
     for (const character of generatedCharacters) {
       const row = await characterRepo.create(id, character);
-      characters.push(row);
+      const { mediaUrl } = await generateCharacterImageToStorage(row);
+      const updated = await characterRepo.update(row.id, { mediaUrl });
+      characters.push(updated ?? row);
     }
 
     return ok(characters);

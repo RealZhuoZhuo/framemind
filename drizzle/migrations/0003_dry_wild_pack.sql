@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "script" text DEFAULT '' NOT NULL;

@@ -16,21 +16,18 @@ import {
 } from "@/components/ui/select";
 
 const SCENE_OPTIONS = SCENE_TYPES.map((v) => ({ label: v, value: v }));
+const EMPTY_LABEL = <span className="text-white/30">无</span>;
 
-function ImageCell({ shot }: { shot: Shot }) {
+function ImageCell({ shot, onGenerate, isGenerating }: { shot: Shot; onGenerate: () => void; isGenerating: boolean }) {
   return (
     <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-[#0d0d0d]">
       {shot.mediaUrl ? (
         <>
-          <div
-            className={cn(
-              "absolute inset-0 bg-gradient-to-br",
-              shot.shotNumber === 1
-                ? "from-blue-950 via-indigo-900 to-slate-900"
-                : "from-slate-900 via-zinc-800 to-neutral-900"
-            )}
+          <img
+            src={shot.mediaUrl}
+            alt={`镜头 ${shot.shotNumber}`}
+            className="h-full w-full object-contain"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           <div className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5">
             <ImageIcon className="h-3 w-3 text-white/60" />
           </div>
@@ -39,9 +36,13 @@ function ImageCell({ shot }: { shot: Shot }) {
           </button>
         </>
       ) : (
-        <button className="flex flex-col items-center gap-1.5 text-white/20 transition-colors hover:text-white/50">
+        <button
+          disabled={isGenerating}
+          onClick={onGenerate}
+          className="flex flex-col items-center gap-1.5 text-white/20 transition-colors hover:text-white/50 disabled:opacity-40"
+        >
           <ImageIcon className="h-7 w-7" />
-          <span className="text-[10px]">生成画面</span>
+          <span className="text-[10px]">{isGenerating ? "生成中…" : "生成画面"}</span>
         </button>
       )}
     </div>
@@ -49,11 +50,21 @@ function ImageCell({ shot }: { shot: Shot }) {
 }
 
 function ShotRow({ shot }: { shot: Shot }) {
-  const { updateShot } = useStoryboardStore();
+  const { updateShot, generateShotImage } = useStoryboardStore();
   const { characters } = useCharacterStore();
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const up = (patch: Partial<Shot>) => updateShot(shot.id, patch);
 
   const charOptions = characters.map((c) => ({ label: c.name, value: c.id }));
+
+  const handleGenerateImage = async () => {
+    setIsGeneratingImage(true);
+    try {
+      await generateShotImage(shot.id);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
 
   return (
     <tr className="group align-top transition-colors hover:bg-white/[0.02] border-b border-white/5">
@@ -65,7 +76,7 @@ function ShotRow({ shot }: { shot: Shot }) {
       </td>
 
       <td className="w-40 border-r border-white/5 px-2 py-3">
-        <ImageCell shot={shot} />
+        <ImageCell shot={shot} onGenerate={handleGenerateImage} isGenerating={isGeneratingImage} />
       </td>
 
       <td className="w-24 border-r border-white/5 px-2 py-3">
@@ -74,11 +85,11 @@ function ShotRow({ shot }: { shot: Shot }) {
           onValueChange={(v) => up({ sceneType: (v === "__clear__" ? "" : v) as typeof shot.sceneType })}
         >
           <SelectTrigger>
-            <SelectValue placeholder={<span className="text-white/30">景别</span>} />
+            <SelectValue placeholder={EMPTY_LABEL} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__clear__">
-              <span className="text-white/40">景别</span>
+              <span className="text-white/40">无</span>
             </SelectItem>
             <SelectSeparator />
             {SCENE_OPTIONS.map((o) => (
@@ -93,11 +104,11 @@ function ShotRow({ shot }: { shot: Shot }) {
       <td className="w-36 border-r border-white/5 px-3 py-3">
         <Select value={shot.characterId || ""} onValueChange={(v) => up({ characterId: v === "__clear__" ? null : v })}>
           <SelectTrigger>
-            <SelectValue placeholder={<span className="text-white/30">角色</span>} />
+            <SelectValue placeholder={EMPTY_LABEL} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__clear__">
-              <span className="text-white/40">角色</span>
+              <span className="text-white/40">无</span>
             </SelectItem>
             <SelectSeparator />
             {charOptions.map((o) => (
@@ -113,7 +124,7 @@ function ShotRow({ shot }: { shot: Shot }) {
         <textarea
           className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
           value={shot.characterAction}
-          placeholder="角色动作……"
+          placeholder="无"
           onChange={(e) => up({ characterAction: e.target.value })}
         />
       </td>
@@ -122,7 +133,7 @@ function ShotRow({ shot }: { shot: Shot }) {
         <textarea
           className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
           value={shot.dialogue}
-          placeholder="角色台词……"
+          placeholder="无"
           onChange={(e) => up({ dialogue: e.target.value })}
         />
       </td>
@@ -131,7 +142,7 @@ function ShotRow({ shot }: { shot: Shot }) {
         <textarea
           className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
           value={shot.lightingMood}
-          placeholder="氛围光影……"
+          placeholder="无"
           onChange={(e) => up({ lightingMood: e.target.value })}
         />
       </td>

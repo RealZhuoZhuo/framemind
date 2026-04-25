@@ -11,33 +11,36 @@ import {
 } from "./prompts";
 import { mergeDistinctText, normalizeName, splitScriptIntoChunks } from "./script-utils";
 
-const textField = z.preprocess((value) => {
-  if (value == null) return "";
-  return typeof value === "string" ? value : String(value);
-}, z.string());
-
-const nullableTextField = z.preprocess((value) => {
-  if (value == null || value === "") return null;
-  return typeof value === "string" ? value : String(value);
-}, z.string().nullable());
-
-const generatedCharacterSchema = z.object({
-  name: z.string().min(1).max(80),
-  appearance: z.string().min(1).max(400),
-  description: z.string().min(1).max(1200),
+const generatedCharacterOutputSchema = z.object({
+  name: z.string(),
+  appearance: z.string(),
+  description: z.string(),
   mediaUrl: z.string(),
 });
 
-const generatedShotDraftSchema = z.object({
-  sceneType: nullableTextField.optional(),
-  characterName: nullableTextField.optional(),
-  dialogue: textField.optional(),
-  characterAction: textField.optional(),
-  lightingMood: textField.optional(),
+const generatedShotDraftOutputSchema = z.object({
+  sceneType: z.string().nullable(),
+  characterName: z.string().nullable(),
+  dialogue: z.string().nullable(),
+  characterAction: z.string().nullable(),
+  lightingMood: z.string().nullable(),
 });
 
-export type GeneratedCharacterRow = z.infer<typeof generatedCharacterSchema>;
-type GeneratedShotDraft = z.infer<typeof generatedShotDraftSchema>;
+type GeneratedCharacterOutput = z.infer<typeof generatedCharacterOutputSchema>;
+type GeneratedShotDraftOutput = z.infer<typeof generatedShotDraftOutputSchema>;
+export type GeneratedCharacterRow = {
+  name: string;
+  appearance: string;
+  description: string;
+  mediaUrl: string;
+};
+type GeneratedShotDraft = {
+  sceneType?: string | null;
+  characterName?: string | null;
+  dialogue?: string;
+  characterAction?: string;
+  lightingMood?: string;
+};
 export type GeneratedShotRow = {
   shotNumber: number;
   sceneType: (typeof SCENE_TYPES)[number] | "";
@@ -47,6 +50,10 @@ export type GeneratedShotRow = {
   lightingMood: string;
   mediaUrl: string;
 };
+
+const CHARACTER_NAME_MAX_LENGTH = 80;
+const CHARACTER_APPEARANCE_MAX_LENGTH = 400;
+const CHARACTER_DESCRIPTION_MAX_LENGTH = 1200;
 
 function normalizeDraftText(value: string | null | undefined) {
   return value?.trim() ?? "";
@@ -72,6 +79,39 @@ function normalizeShotDraft(draft: GeneratedShotDraft): GeneratedShotDraft {
     characterAction: normalizeDraftText(draft.characterAction),
     lightingMood: normalizeDraftText(draft.lightingMood),
   };
+}
+
+function asOptionalText(value: unknown) {
+  if (value == null || value === "") return undefined;
+  return typeof value === "string" ? value : String(value);
+}
+
+function validateGeneratedCharacter(character: GeneratedCharacterOutput) {
+  const name = normalizeDraftText(character.name);
+  const appearance = normalizeDraftText(character.appearance);
+  const description = normalizeDraftText(character.description);
+
+  if (!name || !appearance || !description) return null;
+  if (name.length > CHARACTER_NAME_MAX_LENGTH) return null;
+  if (appearance.length > CHARACTER_APPEARANCE_MAX_LENGTH) return null;
+  if (description.length > CHARACTER_DESCRIPTION_MAX_LENGTH) return null;
+
+  return {
+    name,
+    appearance,
+    description,
+    mediaUrl: "",
+  };
+}
+
+function validateGeneratedShotDraft(draft: GeneratedShotDraftOutput) {
+  return normalizeShotDraft({
+    sceneType: asOptionalText(draft.sceneType),
+    characterName: asOptionalText(draft.characterName),
+    dialogue: asOptionalText(draft.dialogue) ?? "",
+    characterAction: asOptionalText(draft.characterAction) ?? "",
+    lightingMood: asOptionalText(draft.lightingMood) ?? "",
+  });
 }
 
 function extractJsonCandidates(text: string) {
@@ -127,10 +167,10 @@ function parseShotDraftsFromText(text: string) {
 
       const drafts: GeneratedShotDraft[] = [];
       for (const rawDraft of rawDrafts) {
-        const result = generatedShotDraftSchema.safeParse(rawDraft);
-        if (result.success) {
-          drafts.push(normalizeShotDraft(result.data));
-        }
+        if (!rawDraft || typeof rawDraft !== "object") continue;
+
+        const draft = validateGeneratedShotDraft(rawDraft as GeneratedShotDraftOutput);
+        drafts.push(draft);
       }
 
       if (drafts.length > 0) {
@@ -176,38 +216,40 @@ async function generateStructuredShotDrafts(params: {
     timeout: getStructuredOutputTimeout(),
     system: getShotGenerationSystemPrompt(),
     output: Output.array({
-      element: generatedShotDraftSchema,
+      element: generatedShotDraftOutputSchema,
       name: "shots",
       description: "Storyboard shot drafts with sceneType, characterName, dialogue, characterAction, lightingMood.",
     }),
     prompt: getShotGenerationUserPrompt(params),
   });
 
-  try {
-    return result.output.map(normalizeShotDraft);
-  } catch (error) {
-    const fallbackDrafts = parseShotDraftsFromText(result.text);
-    if (fallbackDrafts.length > 0) {
-      console.warn("[AI] Recovered storyboard drafts from raw text fallback", {
-        chunkIndex: params.index,
-        totalChunks: params.total,
-        preview: result.text.slice(0, 800),
-      });
-      return fallbackDrafts;
-    }
+  const drafts = result.output
+    .map(validateGeneratedShotDraft)
+    .filter((draft): draft is GeneratedShotDraft => draft !== null);
 
-    console.error("[AI] Failed to parse structured storyboard output", {
+  if (drafts.length > 0) {
+    return drafts;
+  }
+
+  const fallbackDrafts = parseShotDraftsFromText(result.text);
+  if (fallbackDrafts.length > 0) {
+    console.warn("[AI] Recovered storyboard drafts from raw text fallback", {
       chunkIndex: params.index,
       totalChunks: params.total,
-      error,
       preview: result.text.slice(0, 800),
     });
-
-    throw new NoOutputGeneratedError({
-      message: "No valid storyboard output could be parsed.",
-      cause: error instanceof Error ? error : undefined,
-    });
+    return fallbackDrafts;
   }
+
+  console.error("[AI] Failed to validate structured storyboard output", {
+    chunkIndex: params.index,
+    totalChunks: params.total,
+    preview: result.text.slice(0, 800),
+  });
+
+  throw new NoOutputGeneratedError({
+    message: "No valid storyboard output could be parsed.",
+  });
 }
 
 export async function extractCharactersFromScript(script: string): Promise<GeneratedCharacterRow[]> {
@@ -222,22 +264,22 @@ export async function extractCharactersFromScript(script: string): Promise<Gener
       timeout: getStructuredOutputTimeout(),
       system: getCharacterExtractionSystemPrompt(),
       output: Output.array({
-        element: generatedCharacterSchema,
+        element: generatedCharacterOutputSchema,
         name: "characters",
         description: "Character rows matching the database fields name, appearance, description, mediaUrl.",
       }),
       prompt: getCharacterExtractionUserPrompt(chunk, index, chunks.length),
     });
 
-    for (const character of output) {
+    for (const rawCharacter of output) {
+      const character = validateGeneratedCharacter(rawCharacter);
+      if (!character) continue;
+
       const key = normalizeName(character.name);
       const existing = deduped.get(key);
 
       if (!existing) {
-        deduped.set(key, {
-          ...character,
-          mediaUrl: "",
-        });
+        deduped.set(key, character);
         continue;
       }
 
