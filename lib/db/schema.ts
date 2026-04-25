@@ -72,6 +72,7 @@ export const shots = pgTable(
     shotNumber: integer("shot_number").notNull(),
     sceneType: text("scene_type").notNull().default(""),
     shotDescription: text("shot_description").notNull().default(""),
+    dialogueSpeaker: text("dialogue_speaker").notNull().default(""),
     dialogue: text("dialogue").notNull().default(""),
     characterAction: text("character_action").notNull().default(""),
     lightingMood: text("lighting_mood").notNull().default(""),

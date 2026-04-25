@@ -44,6 +44,7 @@ export class ShotPostgresRepository implements IShotRepository {
         shotNumber,
         sceneType: data.sceneType ?? "",
         shotDescription: data.shotDescription ?? "",
+        dialogueSpeaker: data.dialogueSpeaker ?? "",
         dialogue: data.dialogue ?? "",
         characterAction: data.characterAction ?? "",
         lightingMood: data.lightingMood ?? "",

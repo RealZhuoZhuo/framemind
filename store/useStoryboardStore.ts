@@ -22,6 +22,7 @@ export type Shot = {
   assetIds: string[];
   assets: ShotAsset[];
   shotDescription: string;
+  dialogueSpeaker: string;
   dialogue: string;
   characterAction: string;
   lightingMood: string;

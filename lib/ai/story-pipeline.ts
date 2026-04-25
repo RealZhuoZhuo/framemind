@@ -32,6 +32,7 @@ type GeneratedShotDraft = {
   sceneType?: string | null;
   assetNames?: string[];
   shotDescription?: string;
+  dialogueSpeaker?: string;
   dialogue?: string;
   characterAction?: string;
   lightingMood?: string;
@@ -41,6 +42,7 @@ export type GeneratedShotRow = {
   sceneType: (typeof SCENE_TYPES)[number] | "";
   assetIds: string[];
   shotDescription: string;
+  dialogueSpeaker: string;
   dialogue: string;
   characterAction: string;
   lightingMood: string;
@@ -72,6 +74,7 @@ function normalizeShotDraft(draft: GeneratedShotDraft): GeneratedShotDraft {
     sceneType: normalizeDraftText(draft.sceneType),
     assetNames: [...new Set((draft.assetNames ?? []).map(normalizeDraftText).filter(Boolean))],
     shotDescription: normalizeDraftText(draft.shotDescription),
+    dialogueSpeaker: normalizeDraftText(draft.dialogueSpeaker),
     dialogue: normalizeDraftText(draft.dialogue),
     characterAction: normalizeDraftText(draft.characterAction),
     lightingMood: normalizeDraftText(draft.lightingMood),
@@ -121,6 +124,7 @@ function hasShotContent(draft: GeneratedShotDraft) {
     normalizeDraftText(draft.sceneType) ||
       (draft.assetNames?.length ?? 0) > 0 ||
       normalizeDraftText(draft.shotDescription) ||
+      normalizeDraftText(draft.dialogueSpeaker) ||
       normalizeDraftText(draft.dialogue) ||
       normalizeDraftText(draft.characterAction) ||
       normalizeDraftText(draft.lightingMood)
@@ -157,6 +161,11 @@ function validateGeneratedShotDraft(draft: GeneratedShotDraftOutput) {
       asOptionalText(draft.description) ??
       "",
     dialogue: asOptionalText(draft.dialogue) ?? "",
+    dialogueSpeaker:
+      asOptionalText(draft.dialogueSpeaker) ??
+      asOptionalText(draft.dialogue_speaker) ??
+      asOptionalText(draft.speaker) ??
+      "",
     characterAction:
       asOptionalText(draft.characterAction) ??
       asOptionalText(draft.character_action) ??
@@ -375,6 +384,7 @@ export async function generateShotsFromScript(
         sceneType: normalizeSceneType(shot.sceneType),
         assetIds: resolveAssetIdsByNames(shot.assetNames ?? [], assets),
         shotDescription: normalizeDraftText(shot.shotDescription),
+        dialogueSpeaker: normalizeDraftText(shot.dialogueSpeaker),
         dialogue: normalizeDraftText(shot.dialogue),
         characterAction: normalizeDraftText(shot.characterAction),
         lightingMood: normalizeDraftText(shot.lightingMood),

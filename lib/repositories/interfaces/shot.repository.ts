@@ -16,6 +16,7 @@ export type CreateShotInput = {
   sceneType?: string;
   shotDescription?: string;
   assetIds?: string[];
+  dialogueSpeaker?: string;
   dialogue?: string;
   characterAction?: string;
   lightingMood?: string;

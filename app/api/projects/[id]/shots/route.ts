@@ -33,7 +33,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { shotNumber, sceneType, shotDescription, assetIds, dialogue, characterAction, lightingMood, mediaUrl } = body;
+    const { shotNumber, sceneType, shotDescription, assetIds, dialogueSpeaker, dialogue, characterAction, lightingMood, mediaUrl } = body;
 
     if (shotNumber !== undefined && typeof shotNumber !== "number") {
       return badRequest("shotNumber must be a number");
@@ -50,6 +50,7 @@ export async function POST(
       sceneType,
       shotDescription,
       assetIds: normalizedAssetIds,
+      dialogueSpeaker,
       dialogue,
       characterAction,
       lightingMood,

@@ -33,8 +33,9 @@ function buildShotImagePrompt(shot: ShotRow, boundAssets: AssetRow[], referenced
     shot.sceneType ? `景别：${shot.sceneType}` : "",
     shot.shotDescription ? `分镜描述：${shot.shotDescription}` : "",
     shot.characterAction ? `角色动作：${shot.characterAction}` : "",
+    shot.dialogueSpeaker ? `台词说话者：${shot.dialogueSpeaker}` : "",
     shot.dialogue
-      ? `角色台词：${shot.dialogue}。台词只能归属于当前绑定角色资产；如果台词中的说话者不在绑定角色资产中，必须按画外音处理，不要新增或替换成未绑定角色。`
+      ? `角色台词：${shot.dialogue}。台词只能归属于“台词说话者”字段中的绑定角色资产；如果台词中的说话者不在绑定角色资产中，必须按画外音处理，不要新增或替换成未绑定角色。`
       : "",
     shot.lightingMood ? `氛围光影：${shot.lightingMood}` : "",
     "要求：电影感构图，主体清晰，角色关系明确，光影统一，色彩层次细腻，不要文字、水印、畸形肢体、额外无关角色；绝对不要因为台词生成未绑定的角色。",

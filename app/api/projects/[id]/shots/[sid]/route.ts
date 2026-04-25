@@ -33,6 +33,7 @@ export async function PATCH(
     }
     if (body.sceneType !== undefined) patch.sceneType = String(body.sceneType);
     if (body.shotDescription !== undefined) patch.shotDescription = String(body.shotDescription);
+    if (body.dialogueSpeaker !== undefined) patch.dialogueSpeaker = String(body.dialogueSpeaker);
     if (body.dialogue !== undefined) patch.dialogue = String(body.dialogue);
     if (body.characterAction !== undefined) patch.characterAction = String(body.characterAction);
     if (body.lightingMood !== undefined) patch.lightingMood = String(body.lightingMood);

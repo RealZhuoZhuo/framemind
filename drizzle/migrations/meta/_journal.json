@@ -50,6 +50,13 @@
       "when": 1777107600000,
       "tag": "0006_shot_description",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777111200000,
+      "tag": "0007_shot_dialogue_speaker",
+      "breakpoints": true
     }
   ]
 }

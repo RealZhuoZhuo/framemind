@@ -190,6 +190,15 @@ function ShotRow({ shot }: { shot: Shot }) {
       <td className="w-52 border-r border-white/5 px-3 py-3">
         <textarea
           className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
+          value={shot.dialogueSpeaker}
+          placeholder="无"
+          onChange={(e) => up({ dialogueSpeaker: e.target.value })}
+        />
+      </td>
+
+      <td className="w-52 border-r border-white/5 px-3 py-3">
+        <textarea
+          className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
           value={shot.dialogue}
           placeholder="无"
           onChange={(e) => up({ dialogue: e.target.value })}
@@ -215,6 +224,7 @@ const HEADERS = [
   { label: "资产" },
   { label: "分镜描述" },
   { label: "角色动作" },
+  { label: "台词角色" },
   { label: "角色台词" },
   { label: "氛围光影" },
 ];
@@ -270,7 +280,7 @@ export default function StoryboardTable() {
       ) : null}
 
       <div className="overflow-auto rounded-xl border border-white/8">
-        <table className="min-w-[1360px] w-full table-fixed border-collapse">
+        <table className="min-w-[1520px] w-full table-fixed border-collapse">
           <thead>
             <tr className="border-b border-white/8 bg-white/[0.03]">
               {HEADERS.map((h, i) => (
