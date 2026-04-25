@@ -1,35 +1,38 @@
-import type { CharacterRow } from "@/lib/db/types";
+import type { AssetRow } from "@/lib/db/types";
 import { SCENE_TYPES } from "@/lib/storyboard/constants";
 
-function serializeCharactersForPrompt(characters: CharacterRow[]) {
+function serializeAssetsForPrompt(assets: AssetRow[]) {
   return JSON.stringify(
-    characters.map((character) => ({
-      name: character.name,
-      appearance: character.appearance,
-      description: character.description,
+    assets.map((asset) => ({
+      type: asset.type,
+      name: asset.name,
+      appearance: asset.appearance,
+      description: asset.description,
     })),
     null,
     2
   );
 }
 
-export function getCharacterExtractionSystemPrompt() {
+export function getAssetExtractionSystemPrompt() {
   return [
-    "你是资深影视角色设计师。",
-    "你的任务是阅读剧本并提取主要角色，输出必须严格匹配数据库可写字段。",
-    "只能输出角色数组，每个角色只允许包含：name、appearance、description、mediaUrl。",
-    "appearance 只写可视化外形识别要点，例如年龄感、体型、发型、五官特征、服装风格、标志性配件。",
-    "description 写更完整的角色描述，用于后续生成稳定视觉设定，可以包含性格、身份、服装细节、行为习惯和辨识度信息。",
+    "你是资深影视美术资产设计师。",
+    "你的任务是阅读剧本并提取项目级视觉资产，输出必须严格匹配数据库可写字段。",
+    "只能输出资产数组，每个资产只允许包含：type、name、appearance、description、mediaUrl。",
+    "type 只能是 character、scene、prop。",
+    "角色资产：appearance 写人物外貌、服装、身份和辨识度；description 写完整人物设定、气质、行为习惯和视觉稳定性信息。",
+    "场景资产：appearance 写地点、空间结构、时代/风格、光影氛围、关键陈设；description 写完整空间设定、调度价值和可复用视觉信息。",
+    "道具资产：appearance 写物件形态、材质、用途、辨识细节；description 写道具来源、功能、叙事意义和画面使用方式。",
     "mediaUrl 一律输出空字符串。",
-    "忽略路人、一次性背景人物和没有独立视觉价值的无名角色。",
+    "忽略路人、一次性背景元素和没有独立视觉复用价值的物品。",
   ].join("\n");
 }
 
-export function getCharacterExtractionUserPrompt(chunk: string, index: number, total: number) {
+export function getAssetExtractionUserPrompt(chunk: string, index: number, total: number) {
   return [
     `剧本分段 ${index + 1}/${total}`,
-    "请只提取这一段里具备独立视觉设计价值的主要角色。",
-    "如果同一角色在不同段落反复出现，保持同名，并补充更完整的视觉描述。",
+    "请只提取这一段里具备独立视觉设计价值的角色、场景、道具。",
+    "如果同一资产在不同段落反复出现，保持同名和同类型，并补充更完整的视觉描述。",
     "",
     chunk,
   ].join("\n");
@@ -39,11 +42,13 @@ export function getShotGenerationSystemPrompt() {
   return [
     "你是影视分镜导演。",
     "你的任务是把剧本转成可写入数据库的分镜镜头草稿数组。",
-    "每个镜头只允许包含：sceneType、characterName、dialogue、characterAction、lightingMood。",
+    "每个镜头只允许包含：sceneType、assetNames、shotDescription、dialogue、characterAction、lightingMood。",
     `sceneType 只能使用这些值之一：${SCENE_TYPES.join("、")}，如果无法判断就输出空字符串。`,
-    "characterName 必须直接从提供的角色列表中选择一个真实角色名；如果该镜头没有明确主角色，则输出 null。",
-    "dialogue 只写当前镜头里最核心的台词内容，没有则输出空字符串。",
-    "characterAction 要承担画面描述职责，写清楚人物动作、环境构成、构图重点和镜头主体。",
+    "assetNames 必须是数组，只能直接从提供的资产列表中选择真实资产名；可包含角色、场景和道具；没有明确资产则输出空数组。",
+    "shotDescription 写分镜描述，说明这个镜头的画面内容、构图重点、镜头主体和环境关系；必须基于剧本和提供资产，不要添加剧本外的新事件。",
+    "dialogue 只能摘取当前剧本分段中角色明确说出的原台词；不得改写、扩写或编造台词；没有明确台词就输出空字符串。",
+    "如果 dialogue 属于某个角色说出，则 assetNames 必须包含该说话角色对应的 character 资产；如果提供的资产列表中找不到该角色资产，则该镜头 dialogue 必须输出空字符串。",
+    "characterAction 只能提取或简要概括当前剧本分段中角色明确发生的动作；不得把场景、道具状态写成角色动作；不得编造剧本外动作；没有明确角色动作就输出空字符串。",
     "lightingMood 写灯光、色调、氛围和情绪信息。",
     "不要输出额外字段，不要解释。",
   ].join("\n");
@@ -53,14 +58,22 @@ export function getShotGenerationUserPrompt(params: {
   chunk: string;
   index: number;
   total: number;
-  characters: CharacterRow[];
+  assets: AssetRow[];
 }) {
-  const { chunk, index, total, characters } = params;
+  const { chunk, index, total, assets } = params;
 
   return [
     `本次需要生成剧本分段 ${index + 1}/${total} 的镜头。`,
-    "下面是可选角色列表（只能引用这些角色名）：",
-    serializeCharactersForPrompt(characters),
+    "下面是可选资产列表（只能引用这些资产名）：",
+    serializeAssetsForPrompt(assets),
+    "",
+    "一致性要求：",
+    "1. assetNames 只能引用上方资产列表中的 name。",
+    "2. dialogue 必须来自下方剧本内容里的角色原台词，不能为了画面效果新写台词。",
+    "3. 如果 dialogue 有说话角色，assetNames 必须包含这个说话角色对应的 character 资产；找不到该角色资产时不要输出这句 dialogue。",
+    "4. characterAction 必须来自下方剧本内容里的角色动作，不能为了分镜效果新编动作。",
+    "5. characterAction 中出现的角色也必须包含在 assetNames 的 character 资产里；找不到该角色资产时不要写该角色动作。",
+    "6. shotDescription 可以组织镜头语言，但不能改变剧本事实。",
     "",
     "剧本内容：",
     chunk,

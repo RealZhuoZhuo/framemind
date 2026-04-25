@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useProjectStore, STEPS } from "@/store/useProjectStore";
 import { Button } from "@/components/ui/button";
 import { PanelLeftClose, PanelLeftOpen, Upload, FileText, X } from "lucide-react";
-import CharacterDesign   from "@/components/project/CharacterDesign";
+import AssetManagement   from "@/components/project/AssetManagement";
 import StoryboardTable   from "@/components/project/StoryboardTable";
 import VideoProduction   from "@/components/project/VideoProduction";
 import mammoth from "mammoth";
@@ -183,8 +183,8 @@ export default function StepContent() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto px-8 pb-8">
-        {activeStep === "character"  ? (
-          <CharacterDesign />
+        {activeStep === "assets"  ? (
+          <AssetManagement />
         ) : activeStep === "storyboard" ? (
           <StoryboardTable />
         ) : activeStep === "video" ? (

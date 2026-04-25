@@ -1,14 +1,27 @@
 import { create } from "zustand";
 import type { SceneType } from "@/lib/storyboard/constants";
+import type { AssetType } from "@/store/useAssetStore";
 
 export { SCENE_TYPES } from "@/lib/storyboard/constants";
 export type { SceneType } from "@/lib/storyboard/constants";
+
+export type ShotAsset = {
+  id: string;
+  projectId: string;
+  type: AssetType;
+  name: string;
+  appearance: string;
+  description: string;
+  mediaUrl: string | null;
+};
 
 export type Shot = {
   id: string;
   shotNumber: number;
   sceneType: SceneType;
-  characterId: string | null;
+  assetIds: string[];
+  assets: ShotAsset[];
+  shotDescription: string;
   dialogue: string;
   characterAction: string;
   lightingMood: string;

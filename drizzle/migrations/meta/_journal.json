@@ -36,6 +36,20 @@
       "when": 1777021580676,
       "tag": "0004_quick_schema_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777104000000,
+      "tag": "0005_project_assets",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777107600000,
+      "tag": "0006_shot_description",
+      "breakpoints": true
     }
   ]
 }

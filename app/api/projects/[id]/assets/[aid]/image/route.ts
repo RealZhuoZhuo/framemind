@@ -1,0 +1,24 @@
+import { assetRepo } from "@/lib/repositories";
+import { generateAssetImageToStorage } from "@/lib/ai/asset-image-generation";
+import { notFound, ok, serverError } from "@/app/api/_helpers/api-response";
+
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ id: string; aid: string }> }
+) {
+  try {
+    const { id, aid } = await params;
+    const asset = await assetRepo.findById(aid);
+    if (!asset || asset.projectId !== id) {
+      return notFound("Asset not found");
+    }
+
+    const { mediaUrl } = await generateAssetImageToStorage(asset);
+    const updated = await assetRepo.update(aid, { mediaUrl });
+    if (!updated) return notFound("Asset not found");
+
+    return ok(updated);
+  } catch (e) {
+    return serverError(e);
+  }
+}

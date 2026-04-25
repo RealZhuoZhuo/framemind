@@ -1,17 +1,18 @@
 import { NoOutputGeneratedError, generateText, Output } from "ai";
 import { z } from "zod";
-import type { CharacterRow } from "@/lib/db/types";
+import type { AssetRow, AssetType } from "@/lib/db/types";
 import { SCENE_TYPES } from "@/lib/storyboard/constants";
 import { getStructuredOutputModel, getStructuredOutputTimeout } from "./model";
 import {
-  getCharacterExtractionSystemPrompt,
-  getCharacterExtractionUserPrompt,
+  getAssetExtractionSystemPrompt,
+  getAssetExtractionUserPrompt,
   getShotGenerationSystemPrompt,
   getShotGenerationUserPrompt,
 } from "./prompts";
 import { mergeDistinctText, normalizeName, splitScriptIntoChunks } from "./script-utils";
 
-const generatedCharacterOutputSchema = z.object({
+const generatedAssetOutputSchema = z.object({
+  type: z.enum(["character", "scene", "prop"]),
   name: z.string(),
   appearance: z.string(),
   description: z.string(),
@@ -20,15 +21,17 @@ const generatedCharacterOutputSchema = z.object({
 
 const generatedShotDraftOutputSchema = z.object({
   sceneType: z.string().nullable(),
-  characterName: z.string().nullable(),
+  assetNames: z.array(z.string()).nullable(),
+  shotDescription: z.string().nullable(),
   dialogue: z.string().nullable(),
   characterAction: z.string().nullable(),
   lightingMood: z.string().nullable(),
 });
 
-type GeneratedCharacterOutput = z.infer<typeof generatedCharacterOutputSchema>;
+type GeneratedAssetOutput = z.infer<typeof generatedAssetOutputSchema>;
 type GeneratedShotDraftOutput = z.infer<typeof generatedShotDraftOutputSchema>;
-export type GeneratedCharacterRow = {
+export type GeneratedAssetRow = {
+  type: AssetType;
   name: string;
   appearance: string;
   description: string;
@@ -36,7 +39,8 @@ export type GeneratedCharacterRow = {
 };
 type GeneratedShotDraft = {
   sceneType?: string | null;
-  characterName?: string | null;
+  assetNames?: string[];
+  shotDescription?: string;
   dialogue?: string;
   characterAction?: string;
   lightingMood?: string;
@@ -44,16 +48,17 @@ type GeneratedShotDraft = {
 export type GeneratedShotRow = {
   shotNumber: number;
   sceneType: (typeof SCENE_TYPES)[number] | "";
-  characterId: string | null;
+  assetIds: string[];
+  shotDescription: string;
   dialogue: string;
   characterAction: string;
   lightingMood: string;
   mediaUrl: string;
 };
 
-const CHARACTER_NAME_MAX_LENGTH = 80;
-const CHARACTER_APPEARANCE_MAX_LENGTH = 400;
-const CHARACTER_DESCRIPTION_MAX_LENGTH = 1200;
+const ASSET_NAME_MAX_LENGTH = 100;
+const ASSET_APPEARANCE_MAX_LENGTH = 600;
+const ASSET_DESCRIPTION_MAX_LENGTH = 1600;
 
 function normalizeDraftText(value: string | null | undefined) {
   return value?.trim() ?? "";
@@ -74,7 +79,8 @@ function normalizeSceneType(sceneType: string | null | undefined): GeneratedShot
 function normalizeShotDraft(draft: GeneratedShotDraft): GeneratedShotDraft {
   return {
     sceneType: normalizeDraftText(draft.sceneType),
-    characterName: normalizeDraftText(draft.characterName) || null,
+    assetNames: [...new Set((draft.assetNames ?? []).map(normalizeDraftText).filter(Boolean))],
+    shotDescription: normalizeDraftText(draft.shotDescription),
     dialogue: normalizeDraftText(draft.dialogue),
     characterAction: normalizeDraftText(draft.characterAction),
     lightingMood: normalizeDraftText(draft.lightingMood),
@@ -86,17 +92,19 @@ function asOptionalText(value: unknown) {
   return typeof value === "string" ? value : String(value);
 }
 
-function validateGeneratedCharacter(character: GeneratedCharacterOutput) {
-  const name = normalizeDraftText(character.name);
-  const appearance = normalizeDraftText(character.appearance);
-  const description = normalizeDraftText(character.description);
+function validateGeneratedAsset(asset: GeneratedAssetOutput) {
+  const type = asset.type;
+  const name = normalizeDraftText(asset.name);
+  const appearance = normalizeDraftText(asset.appearance);
+  const description = normalizeDraftText(asset.description);
 
   if (!name || !appearance || !description) return null;
-  if (name.length > CHARACTER_NAME_MAX_LENGTH) return null;
-  if (appearance.length > CHARACTER_APPEARANCE_MAX_LENGTH) return null;
-  if (description.length > CHARACTER_DESCRIPTION_MAX_LENGTH) return null;
+  if (name.length > ASSET_NAME_MAX_LENGTH) return null;
+  if (appearance.length > ASSET_APPEARANCE_MAX_LENGTH) return null;
+  if (description.length > ASSET_DESCRIPTION_MAX_LENGTH) return null;
 
   return {
+    type,
     name,
     appearance,
     description,
@@ -105,9 +113,16 @@ function validateGeneratedCharacter(character: GeneratedCharacterOutput) {
 }
 
 function validateGeneratedShotDraft(draft: GeneratedShotDraftOutput) {
+  const assetNames = Array.isArray(draft.assetNames)
+    ? draft.assetNames
+        .map(asOptionalText)
+        .filter((value): value is string => Boolean(value))
+    : [];
+
   return normalizeShotDraft({
     sceneType: asOptionalText(draft.sceneType),
-    characterName: asOptionalText(draft.characterName),
+    assetNames,
+    shotDescription: asOptionalText(draft.shotDescription) ?? "",
     dialogue: asOptionalText(draft.dialogue) ?? "",
     characterAction: asOptionalText(draft.characterAction) ?? "",
     lightingMood: asOptionalText(draft.lightingMood) ?? "",
@@ -184,31 +199,39 @@ function parseShotDraftsFromText(text: string) {
   return [];
 }
 
-function resolveCharacterIdByName(characterName: string | null, characters: CharacterRow[]) {
-  if (!characterName) return null;
+function resolveAssetIdsByNames(assetNames: string[], assets: AssetRow[]) {
+  const resolved = new Set<string>();
 
-  const normalized = normalizeName(characterName);
-  if (!normalized) return null;
+  for (const assetName of assetNames) {
+    const normalized = normalizeName(assetName);
+    if (!normalized) continue;
 
-  const exactMatch = characters.find((character) => normalizeName(character.name) === normalized);
-  if (exactMatch) return exactMatch.id;
+    const exactMatch = assets.find((asset) => normalizeName(asset.name) === normalized);
+    if (exactMatch) {
+      resolved.add(exactMatch.id);
+      continue;
+    }
 
-  const looseMatch = characters.find((character) => {
-    const normalizedCharacterName = normalizeName(character.name);
-    return (
-      normalizedCharacterName.includes(normalized) ||
-      normalized.includes(normalizedCharacterName)
-    );
-  });
+    const looseMatch = assets.find((asset) => {
+      const normalizedAssetName = normalizeName(asset.name);
+      if (!normalizedAssetName) return false;
+      return normalizedAssetName.includes(normalized) || normalized.includes(normalizedAssetName);
+    });
+    if (looseMatch) resolved.add(looseMatch.id);
+  }
 
-  return looseMatch?.id ?? null;
+  return [...resolved];
+}
+
+function makeAssetKey(asset: Pick<AssetRow, "type" | "name">) {
+  return `${asset.type}:${normalizeName(asset.name)}`;
 }
 
 async function generateStructuredShotDrafts(params: {
   chunk: string;
   index: number;
   total: number;
-  characters: CharacterRow[];
+  assets: AssetRow[];
 }) {
   const result = await generateText({
     model: getStructuredOutputModel(),
@@ -218,7 +241,7 @@ async function generateStructuredShotDrafts(params: {
     output: Output.array({
       element: generatedShotDraftOutputSchema,
       name: "shots",
-      description: "Storyboard shot drafts with sceneType, characterName, dialogue, characterAction, lightingMood.",
+      description: "Storyboard shot drafts with sceneType, assetNames, shotDescription, dialogue, characterAction, lightingMood.",
     }),
     prompt: getShotGenerationUserPrompt(params),
   });
@@ -252,9 +275,9 @@ async function generateStructuredShotDrafts(params: {
   });
 }
 
-export async function extractCharactersFromScript(script: string): Promise<GeneratedCharacterRow[]> {
+export async function extractAssetsFromScript(script: string): Promise<GeneratedAssetRow[]> {
   const chunks = splitScriptIntoChunks(script);
-  const deduped = new Map<string, GeneratedCharacterRow>();
+  const deduped = new Map<string, GeneratedAssetRow>();
 
   for (let index = 0; index < chunks.length; index += 1) {
     const chunk = chunks[index];
@@ -262,31 +285,32 @@ export async function extractCharactersFromScript(script: string): Promise<Gener
       model: getStructuredOutputModel(),
       temperature: 0.2,
       timeout: getStructuredOutputTimeout(),
-      system: getCharacterExtractionSystemPrompt(),
+      system: getAssetExtractionSystemPrompt(),
       output: Output.array({
-        element: generatedCharacterOutputSchema,
-        name: "characters",
-        description: "Character rows matching the database fields name, appearance, description, mediaUrl.",
+        element: generatedAssetOutputSchema,
+        name: "assets",
+        description: "Project assets matching type, name, appearance, description, mediaUrl.",
       }),
-      prompt: getCharacterExtractionUserPrompt(chunk, index, chunks.length),
+      prompt: getAssetExtractionUserPrompt(chunk, index, chunks.length),
     });
 
-    for (const rawCharacter of output) {
-      const character = validateGeneratedCharacter(rawCharacter);
-      if (!character) continue;
+    for (const rawAsset of output) {
+      const asset = validateGeneratedAsset(rawAsset);
+      if (!asset) continue;
 
-      const key = normalizeName(character.name);
+      const key = makeAssetKey(asset);
       const existing = deduped.get(key);
 
       if (!existing) {
-        deduped.set(key, character);
+        deduped.set(key, asset);
         continue;
       }
 
       deduped.set(key, {
+        type: existing.type,
         name: existing.name,
-        appearance: mergeDistinctText(existing.appearance, character.appearance),
-        description: mergeDistinctText(existing.description, character.description),
+        appearance: mergeDistinctText(existing.appearance, asset.appearance),
+        description: mergeDistinctText(existing.description, asset.description),
         mediaUrl: "",
       });
     }
@@ -297,7 +321,7 @@ export async function extractCharactersFromScript(script: string): Promise<Gener
 
 export async function generateShotsFromScript(
   script: string,
-  characters: CharacterRow[]
+  assets: AssetRow[]
 ): Promise<GeneratedShotRow[]> {
   const chunks = splitScriptIntoChunks(script, 5000);
   const generatedShots: GeneratedShotRow[] = [];
@@ -309,7 +333,7 @@ export async function generateShotsFromScript(
       chunk,
       index,
       total: chunks.length,
-      characters,
+      assets,
     });
 
     for (let shotIndex = 0; shotIndex < drafts.length; shotIndex += 1) {
@@ -317,7 +341,8 @@ export async function generateShotsFromScript(
       generatedShots.push({
         shotNumber: startShotNumber + shotIndex,
         sceneType: normalizeSceneType(shot.sceneType),
-        characterId: resolveCharacterIdByName(shot.characterName ?? null, characters),
+        assetIds: resolveAssetIdsByNames(shot.assetNames ?? [], assets),
+        shotDescription: normalizeDraftText(shot.shotDescription),
         dialogue: normalizeDraftText(shot.dialogue),
         characterAction: normalizeDraftText(shot.characterAction),
         lightingMood: normalizeDraftText(shot.lightingMood),

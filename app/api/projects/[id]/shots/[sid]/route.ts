@@ -1,6 +1,18 @@
-import { shotRepo } from "@/lib/repositories";
+import { assetRepo, shotRepo } from "@/lib/repositories";
 import { ok, notFound, noContent, badRequest, serverError } from "@/app/api/_helpers/api-response";
 import type { UpdateShotInput } from "@/lib/repositories/interfaces/shot.repository";
+
+async function normalizeProjectAssetIds(projectId: string, rawAssetIds: unknown) {
+  if (rawAssetIds === undefined) return undefined;
+  if (!Array.isArray(rawAssetIds)) throw new Error("assetIds must be an array");
+
+  const requestedIds = [...new Set(rawAssetIds.map(String).filter(Boolean))];
+  if (requestedIds.length === 0) return [];
+
+  const assets = await assetRepo.findByProject(projectId);
+  const allowedIds = new Set(assets.map((asset) => asset.id));
+  return requestedIds.filter((assetId) => allowedIds.has(assetId));
+}
 
 export async function PATCH(
   request: Request,
@@ -20,14 +32,26 @@ export async function PATCH(
       patch.shotNumber = body.shotNumber;
     }
     if (body.sceneType !== undefined) patch.sceneType = String(body.sceneType);
+    if (body.shotDescription !== undefined) patch.shotDescription = String(body.shotDescription);
     if (body.dialogue !== undefined) patch.dialogue = String(body.dialogue);
     if (body.characterAction !== undefined) patch.characterAction = String(body.characterAction);
     if (body.lightingMood !== undefined) patch.lightingMood = String(body.lightingMood);
-    if ("characterId" in body) patch.characterId = body.characterId || null;
     if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
+    let normalizedAssetIds: string[] | undefined;
+    try {
+      normalizedAssetIds = await normalizeProjectAssetIds(id, body.assetIds);
+    } catch (error) {
+      return badRequest(error instanceof Error ? error.message : "Invalid assetIds");
+    }
 
     const updated = await shotRepo.update(sid, patch);
     if (!updated) return notFound("Shot not found");
+    if (normalizedAssetIds !== undefined) {
+      await shotRepo.setAssets(sid, normalizedAssetIds);
+      const refreshed = await shotRepo.findById(sid);
+      if (!refreshed) return notFound("Shot not found");
+      return ok(refreshed);
+    }
     return ok(updated);
   } catch (e) {
     return serverError(e);

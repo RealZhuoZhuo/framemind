@@ -1,7 +1,7 @@
 import {
   projectRepo,
   stepRepo,
-  characterRepo,
+  assetRepo,
   shotRepo,
   videoClipRepo,
 } from "@/lib/repositories";
@@ -22,9 +22,9 @@ export async function GET(
     const project = await projectRepo.findById(id);
     if (!project) return notFound("Project not found");
 
-    const [stepsRows, characters, shots, clips] = await Promise.all([
+    const [stepsRows, assets, shots, clips] = await Promise.all([
       stepRepo.findByProject(id),
-      characterRepo.findByProject(id),
+      assetRepo.findByProject(id),
       shotRepo.findByProject(id),
       videoClipRepo.findByProject(id),
     ]);
@@ -48,7 +48,7 @@ export async function GET(
     return ok({
       ...project,
       steps,
-      characters,
+      assets,
       shots,
       timeline: { videoClips, subtitleClips, audioClips },
     });

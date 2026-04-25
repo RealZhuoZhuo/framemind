@@ -33,7 +33,7 @@ export const projectSteps = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    stepKey: text("step_key").notNull(), // 'script' | 'character' | 'storyboard' | 'video'
+    stepKey: text("step_key").notNull(), // 'script' | 'assets' | 'storyboard' | 'video'
     completed: boolean("completed").notNull().default(false),
     content: text("content").notNull().default(""),
   },
@@ -43,19 +43,23 @@ export const projectSteps = pgTable(
   ]
 );
 
-export const characters = pgTable(
-  "characters",
+export const projectAssets = pgTable(
+  "project_assets",
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
     name: text("name").notNull(),
     appearance: text("appearance").notNull().default(""),
     description: text("description").notNull().default(""),
     mediaUrl: text("media_url"),
   },
-  (table) => [index("characters_project_id_idx").on(table.projectId)]
+  (table) => [
+    index("project_assets_project_id_idx").on(table.projectId),
+    index("project_assets_project_id_type_idx").on(table.projectId, table.type),
+  ]
 );
 
 export const shots = pgTable(
@@ -67,7 +71,7 @@ export const shots = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     shotNumber: integer("shot_number").notNull(),
     sceneType: text("scene_type").notNull().default(""),
-    characterId: uuid("character_id").references(() => characters.id, { onDelete: "set null" }),
+    shotDescription: text("shot_description").notNull().default(""),
     dialogue: text("dialogue").notNull().default(""),
     characterAction: text("character_action").notNull().default(""),
     lightingMood: text("lighting_mood").notNull().default(""),
@@ -76,7 +80,23 @@ export const shots = pgTable(
   (table) => [
     index("shots_project_id_idx").on(table.projectId),
     index("shots_project_id_shot_number_idx").on(table.projectId, table.shotNumber),
-    index("shots_character_id_idx").on(table.characterId),
+  ]
+);
+
+export const shotAssets = pgTable(
+  "shot_assets",
+  {
+    shotId: uuid("shot_id")
+      .notNull()
+      .references(() => shots.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => projectAssets.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("shot_assets_unique_shot_asset").on(table.shotId, table.assetId),
+    index("shot_assets_shot_id_idx").on(table.shotId),
+    index("shot_assets_asset_id_idx").on(table.assetId),
   ]
 );
 

@@ -5,14 +5,18 @@ import { eq } from "drizzle-orm";
 import type { IStepRepository, StepKey, UpdateStepInput } from "../interfaces/step.repository";
 import type { StepRow } from "@/lib/db/types";
 
-const ALL_STEP_KEYS: StepKey[] = ["script", "character", "storyboard", "video"];
+const ALL_STEP_KEYS: StepKey[] = ["script", "assets", "storyboard", "video"];
 
 export class StepPostgresRepository implements IStepRepository {
   async findByProject(projectId: string): Promise<StepRow[]> {
-    return db
+    const rows = await db
       .select()
       .from(projectSteps)
       .where(eq(projectSteps.projectId, projectId));
+
+    return rows.map((row) =>
+      row.stepKey === "character" ? { ...row, stepKey: "assets" } : row
+    );
   }
 
   async initForProject(projectId: string): Promise<StepRow[]> {

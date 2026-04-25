@@ -1,6 +1,6 @@
 import type { StepRow } from "@/lib/db/types";
 
-export type StepKey = "script" | "character" | "storyboard" | "video";
+export type StepKey = "script" | "assets" | "storyboard" | "video";
 
 export interface IStepRepository {
   findByProject(projectId: string): Promise<StepRow[]>;

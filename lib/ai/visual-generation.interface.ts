@@ -1,6 +1,6 @@
-export type CharacterImageGenerationInput = {
+export type AssetImageGenerationInput = {
   projectId: string;
-  characterId: string;
+  assetId: string;
 };
 
 export type ShotImageGenerationInput = {
@@ -14,14 +14,14 @@ export type ShotVideoGenerationInput = {
 };
 
 export interface IVisualGenerationService {
-  generateCharacterImage(input: CharacterImageGenerationInput): Promise<{ mediaUrl: string | null }>;
+  generateAssetImage(input: AssetImageGenerationInput): Promise<{ mediaUrl: string | null }>;
   generateShotImage(input: ShotImageGenerationInput): Promise<{ mediaUrl: string | null }>;
   generateShotVideo(input: ShotVideoGenerationInput): Promise<{ mediaUrl: string | null }>;
 }
 
 export class StubVisualGenerationService implements IVisualGenerationService {
-  async generateCharacterImage(): Promise<{ mediaUrl: string | null }> {
-    throw new Error("Character image generation is not implemented yet.");
+  async generateAssetImage(): Promise<{ mediaUrl: string | null }> {
+    throw new Error("Asset image generation is not implemented yet.");
   }
 
   async generateShotImage(): Promise<{ mediaUrl: string | null }> {

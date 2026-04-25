@@ -1,60 +1,43 @@
 import { getImageGenerationProvider } from "@/lib/ai/image-generation-provider";
 import { getStorage } from "@/lib/storage";
-import type { CharacterRow, ShotRow } from "@/lib/db/types";
+import type { AssetRow, ShotRow } from "@/lib/db/types";
 
-function normalizeName(value: string) {
-  return value.trim().toLowerCase();
+function assetTypeLabel(type: AssetRow["type"]) {
+  if (type === "character") return "角色";
+  if (type === "scene") return "场景";
+  return "道具";
 }
 
-function collectShotCharacters(shot: ShotRow, characters: CharacterRow[]) {
-  const selected = new Map<string, CharacterRow>();
-
-  if (shot.characterId) {
-    const primary = characters.find((character) => character.id === shot.characterId);
-    if (primary) selected.set(primary.id, primary);
-  }
-
-  const searchableText = [
-    shot.characterAction,
-    shot.dialogue,
-    shot.lightingMood,
-  ].join("\n");
-  const normalizedText = normalizeName(searchableText);
-
-  for (const character of characters) {
-    const name = character.name.trim();
-    if (!name) continue;
-
-    if (searchableText.includes(name) || normalizedText.includes(normalizeName(name))) {
-      selected.set(character.id, character);
-    }
-  }
-
-  return [...selected.values()];
-}
-
-function buildShotImagePrompt(shot: ShotRow, referencedCharacters: CharacterRow[]) {
-  const characterLines = referencedCharacters.map((character, index) => {
+function buildShotImagePrompt(shot: ShotRow, boundAssets: AssetRow[], referencedAssets: AssetRow[]) {
+  const boundCharacterAssets = boundAssets.filter((asset) => asset.type === "character");
+  const boundCharacterNames = boundCharacterAssets.map((asset) => asset.name).join("、");
+  const assetLines = referencedAssets.map((asset, index) => {
     const refIndex = index + 1;
     return [
-      `图${refIndex}对应角色：${character.name}`,
-      character.appearance ? `外貌：${character.appearance}` : "",
-      character.description ? `设定：${character.description}` : "",
-      "生成时必须参考该图保持角色脸型、发型、服装轮廓、年龄感和整体画风一致。",
+      `图${refIndex}对应${assetTypeLabel(asset.type)}：${asset.name}`,
+      asset.appearance ? `视觉：${asset.appearance}` : "",
+      asset.description ? `设定：${asset.description}` : "",
+      "生成时必须参考该图保持资产身份、结构、材质、风格和关键辨识细节一致。",
     ].filter(Boolean).join("；");
   });
 
   return [
-    "请根据提供的参考图生成一张影视分镜画面。图1、图2等分别是不同角色的形象参考；画面必须保持对应角色身份、外貌和统一视觉风格，不要重新设计角色。",
-    referencedCharacters.length > 0 ? "角色参考说明：" : "",
-    ...characterLines,
+    "请根据提供的参考图生成一张影视分镜画面。图1、图2等分别是当前镜头绑定的角色、场景或道具参考；画面必须保持对应资产身份、外观和统一视觉风格。",
+    boundCharacterNames
+      ? `当前镜头绑定角色资产：${boundCharacterNames}。画面中的说话者和发生动作的角色只能来自这些绑定角色资产。`
+      : "当前镜头没有绑定角色资产。即使存在角色台词，也只能作为画外音处理，不要画出说话人物。",
+    referencedAssets.length > 0 ? "资产参考说明：" : "",
+    ...assetLines,
     "",
     `镜号：${shot.shotNumber}`,
     shot.sceneType ? `景别：${shot.sceneType}` : "",
-    shot.characterAction ? `画面动作与构图：${shot.characterAction}` : "",
-    shot.dialogue ? `台词/情绪：${shot.dialogue}` : "",
+    shot.shotDescription ? `分镜描述：${shot.shotDescription}` : "",
+    shot.characterAction ? `角色动作：${shot.characterAction}` : "",
+    shot.dialogue
+      ? `角色台词：${shot.dialogue}。台词只能归属于当前绑定角色资产；如果台词中的说话者不在绑定角色资产中，必须按画外音处理，不要新增或替换成未绑定角色。`
+      : "",
     shot.lightingMood ? `氛围光影：${shot.lightingMood}` : "",
-    "要求：电影感构图，主体清晰，角色关系明确，光影统一，色彩层次细腻，不要文字、水印、畸形肢体、额外无关角色。",
+    "要求：电影感构图，主体清晰，角色关系明确，光影统一，色彩层次细腻，不要文字、水印、畸形肢体、额外无关角色；绝对不要因为台词生成未绑定的角色。",
   ].filter(Boolean).join("\n");
 }
 
@@ -64,15 +47,13 @@ function extensionFromContentType(contentType: string) {
   return "jpg";
 }
 
-export async function generateShotImageToStorage(shot: ShotRow, characters: CharacterRow[]) {
-  const referencedCharacters = collectShotCharacters(shot, characters).filter(
-    (character) => character.mediaUrl
-  );
-  const referenceImages = referencedCharacters.map((character) => ({
-    url: character.mediaUrl as string,
-    label: character.name,
+export async function generateShotImageToStorage(shot: ShotRow, assets: AssetRow[]) {
+  const referencedAssets = assets.filter((asset) => asset.mediaUrl);
+  const referenceImages = referencedAssets.map((asset) => ({
+    url: asset.mediaUrl as string,
+    label: asset.name,
   }));
-  const prompt = buildShotImagePrompt(shot, referencedCharacters);
+  const prompt = buildShotImagePrompt(shot, assets, referencedAssets);
   const generated = await getImageGenerationProvider().generateImage({ prompt, referenceImages });
 
   const imageResponse = await fetch(generated.url);

@@ -2,7 +2,7 @@ import { projectRepo, stepRepo } from "@/lib/repositories";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
 import type { StepKey } from "@/lib/repositories/interfaces/step.repository";
 
-const VALID_KEYS: StepKey[] = ["script", "character", "storyboard", "video"];
+const VALID_KEYS: StepKey[] = ["script", "assets", "storyboard", "video"];
 
 export async function PATCH(
   request: Request,

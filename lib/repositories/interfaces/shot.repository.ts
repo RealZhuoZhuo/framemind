@@ -1,22 +1,25 @@
-import type { ShotRow } from "@/lib/db/types";
+import type { ShotWithAssets } from "@/lib/db/types";
 
 export interface IShotRepository {
-  findByProject(projectId: string): Promise<ShotRow[]>;
-  findById(id: string): Promise<ShotRow | null>;
-  create(projectId: string, data: CreateShotInput): Promise<ShotRow>;
-  update(id: string, data: UpdateShotInput): Promise<ShotRow | null>;
+  findByProject(projectId: string): Promise<ShotWithAssets[]>;
+  findById(id: string): Promise<ShotWithAssets | null>;
+  create(projectId: string, data: CreateShotInput): Promise<ShotWithAssets>;
+  update(id: string, data: UpdateShotInput): Promise<ShotWithAssets | null>;
   delete(id: string): Promise<void>;
   deleteByProject(projectId: string): Promise<void>;
+  setAssets(shotId: string, assetIds: string[]): Promise<void>;
+  findAssetsByShot(shotId: string): Promise<ShotWithAssets["assets"]>;
 }
 
 export type CreateShotInput = {
   shotNumber?: number;
   sceneType?: string;
-  characterId?: string | null;
+  shotDescription?: string;
+  assetIds?: string[];
   dialogue?: string;
   characterAction?: string;
   lightingMood?: string;
   mediaUrl?: string | null;
 };
 
-export type UpdateShotInput = Partial<CreateShotInput>;
+export type UpdateShotInput = Partial<Omit<CreateShotInput, "assetIds">>;

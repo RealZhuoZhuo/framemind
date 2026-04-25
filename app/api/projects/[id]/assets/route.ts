@@ -1,5 +1,12 @@
-import { characterRepo, projectRepo } from "@/lib/repositories";
+import { assetRepo, projectRepo } from "@/lib/repositories";
 import { ok, created, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
+import type { AssetType } from "@/lib/db/types";
+
+const ASSET_TYPES: AssetType[] = ["character", "scene", "prop"];
+
+function isAssetType(value: unknown): value is AssetType {
+  return typeof value === "string" && ASSET_TYPES.includes(value as AssetType);
+}
 
 export async function GET(
   _request: Request,
@@ -9,8 +16,8 @@ export async function GET(
     const { id } = await params;
     const project = await projectRepo.findById(id);
     if (!project) return notFound("Project not found");
-    const characters = await characterRepo.findByProject(id);
-    return ok(characters);
+    const assets = await assetRepo.findByProject(id);
+    return ok(assets);
   } catch (e) {
     return serverError(e);
   }
@@ -25,12 +32,13 @@ export async function POST(
     const project = await projectRepo.findById(id);
     if (!project) return notFound("Project not found");
     const body = await request.json();
-    const { name, appearance, description, mediaUrl } = body;
+    const { type, name, appearance, description, mediaUrl } = body;
 
+    if (!isAssetType(type)) return badRequest("type must be character, scene, or prop");
     if (!name || typeof name !== "string") return badRequest("name is required");
 
-    const character = await characterRepo.create(id, { name, appearance, description, mediaUrl });
-    return created(character);
+    const asset = await assetRepo.create(id, { type, name, appearance, description, mediaUrl });
+    return created(asset);
   } catch (e) {
     return serverError(e);
   }

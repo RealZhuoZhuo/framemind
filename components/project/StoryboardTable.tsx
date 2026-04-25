@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ImageIcon, Download, GripVertical, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
-import { useCharacterStore } from "@/store/useCharacterStore";
+import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import {
   Select,
@@ -17,6 +17,11 @@ import {
 
 const SCENE_OPTIONS = SCENE_TYPES.map((v) => ({ label: v, value: v }));
 const EMPTY_LABEL = <span className="text-white/30">无</span>;
+const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  character: "角色",
+  scene: "场景",
+  prop: "道具",
+};
 
 function ImageCell({ shot, onGenerate, isGenerating }: { shot: Shot; onGenerate: () => void; isGenerating: boolean }) {
   return (
@@ -49,13 +54,72 @@ function ImageCell({ shot, onGenerate, isGenerating }: { shot: Shot; onGenerate:
   );
 }
 
+function AssetTagsCell({
+  shot,
+  assets,
+  onChange,
+}: {
+  shot: Shot;
+  assets: Asset[];
+  onChange: (assetIds: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedAssets = assets.filter((asset) => shot.assetIds.includes(asset.id));
+
+  const toggleAsset = (assetId: string) => {
+    const next = shot.assetIds.includes(assetId)
+      ? shot.assetIds.filter((id) => id !== assetId)
+      : [...shot.assetIds, assetId];
+    onChange(next);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-[34px] w-full flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-left text-xs text-white/60 hover:border-white/20 hover:bg-white/8"
+      >
+        {selectedAssets.length > 0 ? (
+          selectedAssets.map((asset) => (
+            <span key={asset.id} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
+              {ASSET_TYPE_LABELS[asset.type]} · {asset.name}
+            </span>
+          ))
+        ) : (
+          <span className="text-white/30">无</span>
+        )}
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-20 max-h-72 w-64 overflow-auto rounded-lg border border-white/10 bg-[#1b1b1b] p-1.5 shadow-xl">
+          {assets.length > 0 ? (
+            assets.map((asset) => (
+              <label key={asset.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/65 hover:bg-white/6">
+                <input
+                  type="checkbox"
+                  checked={shot.assetIds.includes(asset.id)}
+                  onChange={() => toggleAsset(asset.id)}
+                  className="h-3.5 w-3.5 accent-green-500"
+                />
+                <span className="shrink-0 text-white/35">{ASSET_TYPE_LABELS[asset.type]}</span>
+                <span className="truncate">{asset.name}</span>
+              </label>
+            ))
+          ) : (
+            <div className="px-2 py-4 text-center text-xs text-white/30">暂无资产</div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ShotRow({ shot }: { shot: Shot }) {
   const { updateShot, generateShotImage } = useStoryboardStore();
-  const { characters } = useCharacterStore();
+  const { assets } = useAssetStore();
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const up = (patch: Partial<Shot>) => updateShot(shot.id, patch);
-
-  const charOptions = characters.map((c) => ({ label: c.name, value: c.id }));
 
   const handleGenerateImage = async () => {
     setIsGeneratingImage(true);
@@ -101,23 +165,17 @@ function ShotRow({ shot }: { shot: Shot }) {
         </Select>
       </td>
 
-      <td className="w-36 border-r border-white/5 px-3 py-3">
-        <Select value={shot.characterId || ""} onValueChange={(v) => up({ characterId: v === "__clear__" ? null : v })}>
-          <SelectTrigger>
-            <SelectValue placeholder={EMPTY_LABEL} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__clear__">
-              <span className="text-white/40">无</span>
-            </SelectItem>
-            <SelectSeparator />
-            {charOptions.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <td className="w-56 border-r border-white/5 px-3 py-3">
+        <AssetTagsCell shot={shot} assets={assets} onChange={(assetIds) => up({ assetIds })} />
+      </td>
+
+      <td className="w-60 border-r border-white/5 px-3 py-3">
+        <textarea
+          className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
+          value={shot.shotDescription}
+          placeholder="无"
+          onChange={(e) => up({ shotDescription: e.target.value })}
+        />
       </td>
 
       <td className="w-52 border-r border-white/5 px-3 py-3">
@@ -154,7 +212,8 @@ const HEADERS = [
   { label: "镜号" },
   { label: "画面" },
   { label: "景别" },
-  { label: "角色" },
+  { label: "资产" },
+  { label: "分镜描述" },
   { label: "角色动作" },
   { label: "角色台词" },
   { label: "氛围光影" },
@@ -163,14 +222,14 @@ const HEADERS = [
 export default function StoryboardTable() {
   const projectId = useProjectStore((s) => s.projectId);
   const { shots, isLoading, init, generateShots } = useStoryboardStore();
-  const initCharacters = useCharacterStore((s) => s.init);
+  const initAssets = useAssetStore((s) => s.init);
   const [generateError, setGenerateError] = useState("");
 
   useEffect(() => {
     if (!projectId) return;
     init(projectId);
-    initCharacters(projectId);
-  }, [projectId, init, initCharacters]);
+    initAssets(projectId);
+  }, [projectId, init, initAssets]);
 
   const handleGenerateShots = async () => {
     if (!projectId) return;
@@ -193,7 +252,7 @@ export default function StoryboardTable() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-white/35">基于当前剧本和角色字段自动生成分镜镜头，并写入镜头表。</div>
+        <div className="text-xs text-white/35">基于当前剧本和资产表自动生成分镜镜头，并绑定相关资产。</div>
         <button
           onClick={() => { handleGenerateShots(); }}
           disabled={!projectId || isLoading}
@@ -211,7 +270,7 @@ export default function StoryboardTable() {
       ) : null}
 
       <div className="overflow-auto rounded-xl border border-white/8">
-        <table className="min-w-[980px] w-full table-fixed border-collapse">
+        <table className="min-w-[1360px] w-full table-fixed border-collapse">
           <thead>
             <tr className="border-b border-white/8 bg-white/[0.03]">
               {HEADERS.map((h, i) => (

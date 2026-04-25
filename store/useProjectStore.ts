@@ -1,12 +1,12 @@
 import { create } from "zustand";
-import { useCharacterStore } from "./useCharacterStore";
+import { useAssetStore } from "./useAssetStore";
 import { useStoryboardStore } from "./useStoryboardStore";
 
-export type StepKey = "script" | "character" | "storyboard" | "video";
+export type StepKey = "script" | "assets" | "storyboard" | "video";
 
 export const STEPS: { key: StepKey; label: string; index: number }[] = [
   { key: "script",      label: "故事剧本", index: 1 },
-  { key: "character",   label: "角色设计", index: 2 },
+  { key: "assets",      label: "资产管理", index: 2 },
   { key: "storyboard",  label: "分镜图",   index: 3 },
   { key: "video",       label: "视频制作", index: 4 },
 ];
@@ -37,7 +37,7 @@ type ProjectStore = {
 
 const initial: Record<StepKey, StepState> = {
   script:     { completed: false, content: "" },
-  character:  { completed: false, content: "" },
+  assets:     { completed: false, content: "" },
   storyboard: { completed: false, content: "" },
   video:      { completed: false, content: "" },
 };
@@ -109,14 +109,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ projectId, isLoading: true, isTransitioning: false, transitionError: "", steps: { ...initial }, activeStep: "script" });
     try {
       const res = await fetch(`/api/projects/${projectId}/steps`);
-      const rows = await readJsonOrThrow<{ stepKey: StepKey; completed: boolean; content: string }[]>(res);
+      const rows = await readJsonOrThrow<{ stepKey: StepKey | "character"; completed: boolean; content: string }[]>(res);
       if (!Array.isArray(rows)) {
         throw new Error("Invalid steps payload");
       }
 
       const steps: Record<StepKey, StepState> = { ...initial };
       for (const row of rows) {
-        steps[row.stepKey] = { completed: row.completed, content: row.content };
+        const key = row.stepKey === "character" ? "assets" : row.stepKey;
+        steps[key] = { completed: row.completed, content: row.content };
       }
 
       // Land on the first incomplete step
@@ -173,8 +174,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       if (activeStep === "script") {
         await saveProjectOrThrow(projectId, { script: steps.script.content });
-        await useCharacterStore.getState().generateCharacters(projectId);
-      } else if (activeStep === "character") {
+        await useAssetStore.getState().generateAssets(projectId);
+      } else if (activeStep === "assets") {
         await useStoryboardStore.getState().generateShots(projectId);
       }
 
