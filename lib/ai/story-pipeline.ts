@@ -179,6 +179,73 @@ function validateGeneratedShotDraft(draft: GeneratedShotDraftOutput) {
   });
 }
 
+function sanitizeJsonCandidate(candidate: string) {
+  return candidate
+    .trim()
+    .replace(/^\uFEFF/, "")
+    .replace(/,\s*([}\]])/g, "$1");
+}
+
+function parseJsonCandidate(candidate: string): unknown {
+  const variants = [candidate, sanitizeJsonCandidate(candidate)];
+
+  for (const variant of variants) {
+    try {
+      return JSON.parse(variant);
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
+function extractDelimitedJsonCandidates(text: string, open: "[" | "{", close: "]" | "}") {
+  const candidates: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let quote: "\"" | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === "\"") {
+      quote = char;
+      continue;
+    }
+
+    if (char === open) {
+      if (depth === 0) start = index;
+      depth += 1;
+      continue;
+    }
+
+    if (char === close && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        candidates.push(text.slice(start, index + 1).trim());
+        start = -1;
+      }
+    }
+  }
+
+  return candidates;
+}
+
 function extractJsonCandidates(text: string) {
   const candidates = new Set<string>();
   const trimmed = text.trim();
@@ -189,6 +256,14 @@ function extractJsonCandidates(text: string) {
 
   for (const match of text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)) {
     const candidate = match[1]?.trim();
+    if (candidate) candidates.add(candidate);
+  }
+
+  for (const candidate of extractDelimitedJsonCandidates(text, "[", "]")) {
+    if (candidate) candidates.add(candidate);
+  }
+
+  for (const candidate of extractDelimitedJsonCandidates(text, "{", "}")) {
     if (candidate) candidates.add(candidate);
   }
 
@@ -207,7 +282,7 @@ function extractJsonCandidates(text: string) {
   return [...candidates];
 }
 
-function coerceShotDraftArray(payload: unknown) {
+function coerceShotDraftArray(payload: unknown): unknown[] | null {
   if (Array.isArray(payload)) {
     return payload;
   }
@@ -231,31 +306,72 @@ function coerceShotDraftArray(payload: unknown) {
   return null;
 }
 
+function normalizeRawShotDrafts(rawDrafts: unknown[]) {
+  const drafts: GeneratedShotDraft[] = [];
+
+  for (const rawDraft of rawDrafts) {
+    if (!rawDraft || typeof rawDraft !== "object") continue;
+
+    const draft = validateGeneratedShotDraft(rawDraft as GeneratedShotDraftOutput);
+    if (!hasShotContent(draft)) continue;
+    drafts.push(draft);
+  }
+
+  return drafts;
+}
+
+function isSingleShotObject(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const record = payload as Record<string, unknown>;
+  return (
+    "sceneType" in record ||
+    "shotDescription" in record ||
+    "dialogue" in record ||
+    "characterAction" in record
+  );
+}
+
+function makeShotDraftKey(draft: GeneratedShotDraft) {
+  return [
+    draft.sceneType,
+    draft.assetNames?.join("、"),
+    draft.shotDescription,
+    draft.dialogueSpeaker,
+    draft.dialogue,
+    draft.characterAction,
+    draft.lightingMood,
+  ].join("\u0001");
+}
+
 function parseShotDraftsFromText(text: string) {
+  const recoveredDrafts: GeneratedShotDraft[] = [];
+  const recoveredKeys = new Set<string>();
+
   for (const candidate of extractJsonCandidates(text)) {
-    try {
-      const parsed = JSON.parse(candidate);
-      const rawDrafts = coerceShotDraftArray(parsed);
-      if (!rawDrafts) continue;
+    const parsed = parseJsonCandidate(candidate);
+    if (parsed === undefined) continue;
 
-      const drafts: GeneratedShotDraft[] = [];
-      for (const rawDraft of rawDrafts) {
-        if (!rawDraft || typeof rawDraft !== "object") continue;
+    const rawDrafts = coerceShotDraftArray(parsed);
+    if (!rawDrafts) continue;
 
-        const draft = validateGeneratedShotDraft(rawDraft as GeneratedShotDraftOutput);
-        if (!hasShotContent(draft)) continue;
-        drafts.push(draft);
-      }
-
-      if (drafts.length > 0) {
-        return drafts;
-      }
-    } catch {
+    const drafts = normalizeRawShotDrafts(rawDrafts);
+    if (drafts.length === 0) {
       continue;
+    }
+
+    if (!isSingleShotObject(parsed)) {
+      return drafts;
+    }
+
+    for (const draft of drafts) {
+      const key = makeShotDraftKey(draft);
+      if (recoveredKeys.has(key)) continue;
+      recoveredKeys.add(key);
+      recoveredDrafts.push(draft);
     }
   }
 
-  return [];
+  return recoveredDrafts;
 }
 
 function resolveAssetIdsByNames(assetNames: string[], assets: AssetRow[]) {

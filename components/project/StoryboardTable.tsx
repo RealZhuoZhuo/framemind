@@ -115,6 +115,83 @@ function AssetTagsCell({
   );
 }
 
+function splitDialogueSpeakers(value: string) {
+  return value
+    .split(/[、,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function DialogueCell({
+  shot,
+  assets,
+  onChange,
+}: {
+  shot: Shot;
+  assets: Asset[];
+  onChange: (patch: Partial<Shot>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const characterAssets = assets.filter((asset) => asset.type === "character");
+  const selectedSpeakers = splitDialogueSpeakers(shot.dialogueSpeaker);
+  const selectedSpeakerSet = new Set(selectedSpeakers);
+
+  const toggleSpeaker = (name: string) => {
+    const next = selectedSpeakerSet.has(name)
+      ? selectedSpeakers.filter((speaker) => speaker !== name)
+      : [...selectedSpeakers, name];
+    onChange({ dialogueSpeaker: next.join("、") });
+  };
+
+  return (
+    <div className="relative flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-[34px] w-full flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-left text-xs text-white/60 hover:border-white/20 hover:bg-white/8"
+      >
+        {selectedSpeakers.length > 0 ? (
+          selectedSpeakers.map((speaker) => (
+            <span key={speaker} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
+              角色 · {speaker}
+            </span>
+          ))
+        ) : (
+          <span className="text-white/30">无</span>
+        )}
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-[40px] z-20 max-h-72 w-64 overflow-auto rounded-lg border border-white/10 bg-[#1b1b1b] p-1.5 shadow-xl">
+          {characterAssets.length > 0 ? (
+            characterAssets.map((asset) => (
+              <label key={asset.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/65 hover:bg-white/6">
+                <input
+                  type="checkbox"
+                  checked={selectedSpeakerSet.has(asset.name)}
+                  onChange={() => toggleSpeaker(asset.name)}
+                  className="h-3.5 w-3.5 accent-green-500"
+                />
+                <span className="shrink-0 text-white/35">角色</span>
+                <span className="truncate">{asset.name}</span>
+              </label>
+            ))
+          ) : (
+            <div className="px-2 py-4 text-center text-xs text-white/30">暂无角色资产</div>
+          )}
+        </div>
+      ) : null}
+
+      <textarea
+        className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
+        value={shot.dialogue}
+        placeholder="无"
+        onChange={(e) => onChange({ dialogue: e.target.value })}
+      />
+    </div>
+  );
+}
+
 function ShotRow({ shot }: { shot: Shot }) {
   const { updateShot, generateShotImage } = useStoryboardStore();
   const { assets } = useAssetStore();
@@ -187,22 +264,8 @@ function ShotRow({ shot }: { shot: Shot }) {
         />
       </td>
 
-      <td className="w-52 border-r border-white/5 px-3 py-3">
-        <textarea
-          className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
-          value={shot.dialogueSpeaker}
-          placeholder="无"
-          onChange={(e) => up({ dialogueSpeaker: e.target.value })}
-        />
-      </td>
-
-      <td className="w-52 border-r border-white/5 px-3 py-3">
-        <textarea
-          className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
-          value={shot.dialogue}
-          placeholder="无"
-          onChange={(e) => up({ dialogue: e.target.value })}
-        />
+      <td className="w-64 border-r border-white/5 px-3 py-3">
+        <DialogueCell shot={shot} assets={assets} onChange={up} />
       </td>
 
       <td className="px-3 py-3">
@@ -224,7 +287,6 @@ const HEADERS = [
   { label: "资产" },
   { label: "分镜描述" },
   { label: "角色动作" },
-  { label: "台词角色" },
   { label: "角色台词" },
   { label: "氛围光影" },
 ];
@@ -280,7 +342,7 @@ export default function StoryboardTable() {
       ) : null}
 
       <div className="overflow-auto rounded-xl border border-white/8">
-        <table className="min-w-[1520px] w-full table-fixed border-collapse">
+        <table className="min-w-[1400px] w-full table-fixed border-collapse">
           <thead>
             <tr className="border-b border-white/8 bg-white/[0.03]">
               {HEADERS.map((h, i) => (
