@@ -19,17 +19,8 @@ const generatedAssetOutputSchema = z.object({
   mediaUrl: z.string(),
 });
 
-const generatedShotDraftOutputSchema = z.object({
-  sceneType: z.string().nullable(),
-  assetNames: z.array(z.string()).nullable(),
-  shotDescription: z.string().nullable(),
-  dialogue: z.string().nullable(),
-  characterAction: z.string().nullable(),
-  lightingMood: z.string().nullable(),
-});
-
 type GeneratedAssetOutput = z.infer<typeof generatedAssetOutputSchema>;
-type GeneratedShotDraftOutput = z.infer<typeof generatedShotDraftOutputSchema>;
+type GeneratedShotDraftOutput = Record<string, unknown>;
 export type GeneratedAssetRow = {
   type: AssetType;
   name: string;
@@ -89,7 +80,51 @@ function normalizeShotDraft(draft: GeneratedShotDraft): GeneratedShotDraft {
 
 function asOptionalText(value: unknown) {
   if (value == null || value === "") return undefined;
+  if (typeof value === "object") return undefined;
   return typeof value === "string" ? value : String(value);
+}
+
+function asTextArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (item && typeof item === "object") {
+          const record = item as Record<string, unknown>;
+          return asOptionalText(record.name) ?? asOptionalText(record.assetName) ?? [];
+        }
+        return asOptionalText(item) ?? [];
+      })
+      .filter((item): item is string => Boolean(item));
+  }
+
+  const text = asOptionalText(value);
+  if (!text) return [];
+
+  return text
+    .split(/[、,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function readShotAssetNames(draft: GeneratedShotDraftOutput) {
+  const directNames = asTextArray(draft.assetNames);
+  if (directNames.length > 0) return directNames;
+
+  const fallbackNames = asTextArray(draft.assets);
+  if (fallbackNames.length > 0) return fallbackNames;
+
+  return asTextArray(draft.assetName);
+}
+
+function hasShotContent(draft: GeneratedShotDraft) {
+  return Boolean(
+    normalizeDraftText(draft.sceneType) ||
+      (draft.assetNames?.length ?? 0) > 0 ||
+      normalizeDraftText(draft.shotDescription) ||
+      normalizeDraftText(draft.dialogue) ||
+      normalizeDraftText(draft.characterAction) ||
+      normalizeDraftText(draft.lightingMood)
+  );
 }
 
 function validateGeneratedAsset(asset: GeneratedAssetOutput) {
@@ -113,19 +148,25 @@ function validateGeneratedAsset(asset: GeneratedAssetOutput) {
 }
 
 function validateGeneratedShotDraft(draft: GeneratedShotDraftOutput) {
-  const assetNames = Array.isArray(draft.assetNames)
-    ? draft.assetNames
-        .map(asOptionalText)
-        .filter((value): value is string => Boolean(value))
-    : [];
-
   return normalizeShotDraft({
     sceneType: asOptionalText(draft.sceneType),
-    assetNames,
-    shotDescription: asOptionalText(draft.shotDescription) ?? "",
+    assetNames: readShotAssetNames(draft),
+    shotDescription:
+      asOptionalText(draft.shotDescription) ??
+      asOptionalText(draft.shot_description) ??
+      asOptionalText(draft.description) ??
+      "",
     dialogue: asOptionalText(draft.dialogue) ?? "",
-    characterAction: asOptionalText(draft.characterAction) ?? "",
-    lightingMood: asOptionalText(draft.lightingMood) ?? "",
+    characterAction:
+      asOptionalText(draft.characterAction) ??
+      asOptionalText(draft.character_action) ??
+      asOptionalText(draft.action) ??
+      "",
+    lightingMood:
+      asOptionalText(draft.lightingMood) ??
+      asOptionalText(draft.lighting_mood) ??
+      asOptionalText(draft.mood) ??
+      "",
   });
 }
 
@@ -168,6 +209,14 @@ function coerceShotDraftArray(payload: unknown) {
     if (Array.isArray(record.shots)) return record.shots;
     if (Array.isArray(record.elements)) return record.elements;
     if (Array.isArray(record.data)) return record.data;
+    if (
+      "sceneType" in record ||
+      "shotDescription" in record ||
+      "dialogue" in record ||
+      "characterAction" in record
+    ) {
+      return [record];
+    }
   }
 
   return null;
@@ -185,6 +234,7 @@ function parseShotDraftsFromText(text: string) {
         if (!rawDraft || typeof rawDraft !== "object") continue;
 
         const draft = validateGeneratedShotDraft(rawDraft as GeneratedShotDraftOutput);
+        if (!hasShotContent(draft)) continue;
         drafts.push(draft);
       }
 
@@ -238,33 +288,15 @@ async function generateStructuredShotDrafts(params: {
     temperature: 0.2,
     timeout: getStructuredOutputTimeout(),
     system: getShotGenerationSystemPrompt(),
-    output: Output.array({
-      element: generatedShotDraftOutputSchema,
-      name: "shots",
-      description: "Storyboard shot drafts with sceneType, assetNames, shotDescription, dialogue, characterAction, lightingMood.",
-    }),
     prompt: getShotGenerationUserPrompt(params),
   });
 
-  const drafts = result.output
-    .map(validateGeneratedShotDraft)
-    .filter((draft): draft is GeneratedShotDraft => draft !== null);
-
+  const drafts = parseShotDraftsFromText(result.text);
   if (drafts.length > 0) {
     return drafts;
   }
 
-  const fallbackDrafts = parseShotDraftsFromText(result.text);
-  if (fallbackDrafts.length > 0) {
-    console.warn("[AI] Recovered storyboard drafts from raw text fallback", {
-      chunkIndex: params.index,
-      totalChunks: params.total,
-      preview: result.text.slice(0, 800),
-    });
-    return fallbackDrafts;
-  }
-
-  console.error("[AI] Failed to validate structured storyboard output", {
+  console.error("[AI] Failed to parse storyboard JSON output", {
     chunkIndex: params.index,
     totalChunks: params.total,
     preview: result.text.slice(0, 800),

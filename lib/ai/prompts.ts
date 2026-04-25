@@ -50,7 +50,9 @@ export function getShotGenerationSystemPrompt() {
     "如果 dialogue 属于某个角色说出，则 assetNames 必须包含该说话角色对应的 character 资产；如果提供的资产列表中找不到该角色资产，则该镜头 dialogue 必须输出空字符串。",
     "characterAction 只能提取或简要概括当前剧本分段中角色明确发生的动作；不得把场景、道具状态写成角色动作；不得编造剧本外动作；没有明确角色动作就输出空字符串。",
     "lightingMood 写灯光、色调、氛围和情绪信息。",
-    "不要输出额外字段，不要解释。",
+    "只输出 JSON 数组，不要输出 Markdown、代码块、解释或额外文字。",
+    "数组元素字段固定为：sceneType、assetNames、shotDescription、dialogue、characterAction、lightingMood。",
+    "assetNames 必须是字符串数组；其他字段必须是字符串；没有内容用空字符串或空数组。",
   ].join("\n");
 }
 
@@ -74,6 +76,10 @@ export function getShotGenerationUserPrompt(params: {
     "4. characterAction 必须来自下方剧本内容里的角色动作，不能为了分镜效果新编动作。",
     "5. characterAction 中出现的角色也必须包含在 assetNames 的 character 资产里；找不到该角色资产时不要写该角色动作。",
     "6. shotDescription 可以组织镜头语言，但不能改变剧本事实。",
+    "",
+    "输出格式示例：",
+    `[{"sceneType":"中景","assetNames":["角色名","场景名"],"shotDescription":"画面和构图描述","dialogue":"剧本原台词","characterAction":"剧本里的角色动作","lightingMood":"光影氛围"}]`,
+    "只输出 JSON 数组本身。",
     "",
     "剧本内容：",
     chunk,

@@ -1,12 +1,12 @@
 "use client";
 
-import { Bell, HelpCircle, Menu, Zap, Coins, Image, Briefcase } from "lucide-react";
+import { Bell, HelpCircle, Menu, Zap, Coins, Image as ImageIcon, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useHomeStore, type NavItem } from "@/store/useHomeStore";
 
 const NAV_ITEMS: { key: NavItem; label: string; icon: React.ReactNode }[] = [
-  { key: "materials", label: "我的素材", icon: <Image className="h-3.5 w-3.5" /> },
+  { key: "materials", label: "我的素材", icon: <ImageIcon className="h-3.5 w-3.5" /> },
   { key: "workspace", label: "工作中心", icon: <Briefcase className="h-3.5 w-3.5" /> },
 ];
 

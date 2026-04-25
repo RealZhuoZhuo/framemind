@@ -6,7 +6,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useRouter } from "next/navigation";
 
 export default function ProjectTopBar() {
-  const { nextStep, canGoNext, activeStep } = useProjectStore();
+  const { nextStep, canGoNext } = useProjectStore();
   const router = useRouter();
 
   return (

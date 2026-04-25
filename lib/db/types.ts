@@ -1,23 +1,23 @@
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import type { projectAssets, projects, projectSteps, shotAssets, shots, videoClips } from "./schema";
+import type * as schema from "./schema";
 
-export type ProjectRow = InferSelectModel<typeof projects>;
-export type ProjectInsert = InferInsertModel<typeof projects>;
+export type ProjectRow = InferSelectModel<typeof schema.projects>;
+export type ProjectInsert = InferInsertModel<typeof schema.projects>;
 
-export type StepRow = InferSelectModel<typeof projectSteps>;
-export type StepInsert = InferInsertModel<typeof projectSteps>;
+export type StepRow = InferSelectModel<typeof schema.projectSteps>;
+export type StepInsert = InferInsertModel<typeof schema.projectSteps>;
 
 export type AssetType = "character" | "scene" | "prop";
-export type AssetRow = InferSelectModel<typeof projectAssets> & { type: AssetType };
-export type AssetInsert = InferInsertModel<typeof projectAssets>;
+export type AssetRow = InferSelectModel<typeof schema.projectAssets> & { type: AssetType };
+export type AssetInsert = InferInsertModel<typeof schema.projectAssets>;
 
-export type ShotRow = InferSelectModel<typeof shots>;
-export type ShotInsert = InferInsertModel<typeof shots>;
-export type ShotAssetRow = InferSelectModel<typeof shotAssets>;
+export type ShotRow = InferSelectModel<typeof schema.shots>;
+export type ShotInsert = InferInsertModel<typeof schema.shots>;
+export type ShotAssetRow = InferSelectModel<typeof schema.shotAssets>;
 export type ShotWithAssets = ShotRow & {
   assetIds: string[];
   assets: AssetRow[];
 };
 
-export type VideoClipRow = InferSelectModel<typeof videoClips>;
-export type VideoClipInsert = InferInsertModel<typeof videoClips>;
+export type VideoClipRow = InferSelectModel<typeof schema.videoClips>;
+export type VideoClipInsert = InferInsertModel<typeof schema.videoClips>;

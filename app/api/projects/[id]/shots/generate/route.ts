@@ -38,7 +38,7 @@ export async function POST(
     return ok(shots);
   } catch (e) {
     if (NoOutputGeneratedError.isInstance(e)) {
-      return badRequest("AI did not return valid structured storyboard data. Retry or simplify the script content.");
+      return badRequest("AI did not return a valid storyboard JSON array. Retry or simplify the script content.");
     }
     return serverError(e);
   }
