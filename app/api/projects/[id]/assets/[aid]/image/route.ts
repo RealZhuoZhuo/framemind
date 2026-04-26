@@ -1,5 +1,5 @@
 import { assetRepo } from "@/lib/repositories";
-import { generateAssetImageToStorage } from "@/lib/ai/asset-image-generation";
+import { generateAssetImageToStorage } from "@/lib/ai/image";
 import { notFound, ok, serverError } from "@/app/api/_helpers/api-response";
 import { withSignedMediaUrl } from "@/lib/storage/media-url";
 

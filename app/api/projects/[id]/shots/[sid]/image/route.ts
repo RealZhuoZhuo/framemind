@@ -1,4 +1,4 @@
-import { generateShotImageToStorage } from "@/lib/ai/shot-image-generation";
+import { generateShotImageToStorage } from "@/lib/ai/image";
 import { shotRepo } from "@/lib/repositories";
 import { notFound, ok, serverError } from "@/app/api/_helpers/api-response";
 import { withSignedShotMedia } from "@/lib/storage/media-url";

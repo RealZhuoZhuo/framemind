@@ -5,7 +5,7 @@ import type {
   VideoGenerationError,
   VideoGenerationStatus,
   VideoGenerationTaskOutput,
-} from "@/lib/ai/video-generation.interface";
+} from "./generation.interface";
 
 const DEFAULT_SEEDANCE_MODEL = "doubao-seedance-1-5-pro-251215";
 const DEFAULT_ARK_VIDEO_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks";

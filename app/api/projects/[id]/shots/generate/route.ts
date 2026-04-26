@@ -1,7 +1,6 @@
 import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
-import { getProjectScript } from "@/lib/ai/project-script";
-import { generateShotsFromScript } from "@/lib/ai/story-pipeline";
+import { generateShotsFromScript, getProjectScript } from "@/lib/ai/text";
 import { assetRepo, projectRepo, shotRepo } from "@/lib/repositories";
 import { normalizeMediaStorageValue, withSignedShotMediaList } from "@/lib/storage/media-url";
 
