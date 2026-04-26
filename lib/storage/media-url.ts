@@ -3,7 +3,7 @@ import { getStorage } from "@/lib/storage";
 const PROJECT_OBJECT_KEY_PREFIX = "projects/";
 const DEFAULT_SIGNED_MEDIA_TTL_SECONDS = 24 * 60 * 60;
 
-function configuredMediaTtlSeconds() {
+export function getMediaUrlTtlSeconds() {
   const raw = Number(process.env.MEDIA_URL_TTL_SECONDS);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_SIGNED_MEDIA_TTL_SECONDS;
 }
@@ -40,7 +40,7 @@ export function normalizeMediaStorageValue(value: string | null | undefined) {
   return getStorageKeyFromMediaUrl(raw) ?? raw;
 }
 
-export async function signMediaUrl(value: string | null | undefined, ttlSeconds = configuredMediaTtlSeconds()) {
+export async function signMediaUrl(value: string | null | undefined, ttlSeconds = getMediaUrlTtlSeconds()) {
   const raw = value?.trim();
   if (!raw) return null;
 

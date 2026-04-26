@@ -51,16 +51,21 @@ async function readJsonOrThrow<T>(res: Response): Promise<T> {
 type StoryboardStore = {
   projectId: string | null;
   isLoading: boolean;
+  isGeneratingAllImages: boolean;
+  imageGenerationProgress: { completed: number; total: number };
   shots: Shot[];
   init: (projectId: string) => Promise<void>;
   updateShot: (id: string, patch: Partial<Shot>) => Promise<void>;
   generateShots: (projectId: string) => Promise<void>;
   generateShotImage: (id: string) => Promise<void>;
+  generateAllShotImages: () => Promise<void>;
 };
 
 export const useStoryboardStore = create<StoryboardStore>((set, get) => ({
   projectId: null,
   isLoading: false,
+  isGeneratingAllImages: false,
+  imageGenerationProgress: { completed: 0, total: 0 },
   shots: [],
 
   init: async (projectId) => {
@@ -116,5 +121,44 @@ export const useStoryboardStore = create<StoryboardStore>((set, get) => ({
     set((state) => ({
       shots: state.shots.map((shot) => (shot.id === id ? row : shot)),
     }));
+  },
+
+  generateAllShotImages: async () => {
+    const { projectId, shots } = get();
+    if (!projectId) return;
+    if (shots.length === 0) {
+      throw new Error("暂无可生成画面的分镜");
+    }
+
+    set({
+      isGeneratingAllImages: true,
+      imageGenerationProgress: { completed: 0, total: shots.length },
+    });
+
+    const failed: number[] = [];
+
+    for (const [index, shot] of shots.entries()) {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/shots/${shot.id}/image`, {
+          method: "POST",
+        });
+        const row = await readJsonOrThrow<Shot>(res);
+
+        set((state) => ({
+          shots: state.shots.map((item) => (item.id === shot.id ? row : item)),
+          imageGenerationProgress: { completed: index + 1, total: shots.length },
+        }));
+      } catch (error) {
+        failed.push(shot.shotNumber);
+        console.error(`Failed to generate storyboard image for shot ${shot.shotNumber}:`, error);
+        set({ imageGenerationProgress: { completed: index + 1, total: shots.length } });
+      }
+    }
+
+    set({ isGeneratingAllImages: false });
+
+    if (failed.length > 0) {
+      throw new Error(`${failed.length} 个分镜图生成失败：${failed.join("、")}`);
+    }
   },
 }));

@@ -1,5 +1,5 @@
 import { getStorage } from "@/lib/storage";
-import { getStorageKeyFromMediaUrl } from "@/lib/storage/media-url";
+import { getMediaUrlTtlSeconds, getStorageKeyFromMediaUrl } from "@/lib/storage/media-url";
 import { ok, badRequest, serverError } from "@/app/api/_helpers/api-response";
 
 export async function GET(
@@ -18,7 +18,8 @@ export async function GET(
       return badRequest("key does not belong to this project");
     }
 
-    const ttl = Number(searchParams.get("ttl") ?? 3600);
+    const requestedTtl = Number(searchParams.get("ttl"));
+    const ttl = Number.isFinite(requestedTtl) && requestedTtl > 0 ? requestedTtl : getMediaUrlTtlSeconds();
     const storage = getStorage();
     const url = await storage.presign(key, ttl);
     return ok({ url, expiresIn: ttl });

@@ -1,4 +1,5 @@
 import { getStorage } from "@/lib/storage";
+import { getMediaUrlTtlSeconds } from "@/lib/storage/media-url";
 import { created, badRequest, serverError } from "@/app/api/_helpers/api-response";
 
 const CONTENT_TYPE_MAP: Record<string, string> = {
@@ -62,7 +63,7 @@ export async function POST(
 
     const storage = getStorage();
     await storage.upload(key, buffer, contentType);
-    const url = await storage.presign(key, 24 * 60 * 60);
+    const url = await storage.presign(key, getMediaUrlTtlSeconds());
 
     return created({ key, url, filename: file.name, size: file.size });
   } catch (e) {

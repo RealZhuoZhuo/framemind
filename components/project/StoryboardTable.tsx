@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageIcon, Download, GripVertical, Sparkles } from "lucide-react";
+import { ImageIcon, Images, Download, GripVertical, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
@@ -300,7 +300,15 @@ const HEADERS = [
 
 export default function StoryboardTable() {
   const projectId = useProjectStore((s) => s.projectId);
-  const { shots, isLoading, init, generateShots } = useStoryboardStore();
+  const {
+    shots,
+    isLoading,
+    isGeneratingAllImages,
+    imageGenerationProgress,
+    init,
+    generateShots,
+    generateAllShotImages,
+  } = useStoryboardStore();
   const initAssets = useAssetStore((s) => s.init);
   const [generateError, setGenerateError] = useState("");
 
@@ -320,6 +328,15 @@ export default function StoryboardTable() {
     }
   };
 
+  const handleGenerateAllShotImages = async () => {
+    setGenerateError("");
+    try {
+      await generateAllShotImages();
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : "批量生成分镜图失败");
+    }
+  };
+
   if (isLoading && shots.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center">
@@ -332,14 +349,26 @@ export default function StoryboardTable() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-white/35">基于当前剧本和资产表自动生成分镜镜头，并绑定相关资产。</div>
-        <button
-          onClick={() => { handleGenerateShots(); }}
-          disabled={!projectId || isLoading}
-          className="flex h-9 items-center gap-2 rounded-lg bg-green-500/15 px-4 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-40"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          {isLoading ? "生成中…" : "AI生成分镜"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { handleGenerateAllShotImages(); }}
+            disabled={!projectId || shots.length === 0 || isLoading || isGeneratingAllImages}
+            className="flex h-9 items-center gap-2 rounded-lg bg-white/8 px-4 text-xs font-medium text-white/70 transition-colors hover:bg-white/14 hover:text-white disabled:opacity-40"
+          >
+            <Images className="h-3.5 w-3.5" />
+            {isGeneratingAllImages
+              ? `生成 ${imageGenerationProgress.completed}/${imageGenerationProgress.total}`
+              : "生成全部分镜图"}
+          </button>
+          <button
+            onClick={() => { handleGenerateShots(); }}
+            disabled={!projectId || isLoading || isGeneratingAllImages}
+            className="flex h-9 items-center gap-2 rounded-lg bg-green-500/15 px-4 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-40"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {isLoading ? "生成中…" : "AI生成分镜"}
+          </button>
+        </div>
       </div>
 
       {generateError ? (
