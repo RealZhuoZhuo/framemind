@@ -61,7 +61,8 @@ export async function POST(
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const storage = getStorage();
-    const url = await storage.upload(key, buffer, contentType);
+    await storage.upload(key, buffer, contentType);
+    const url = await storage.presign(key, 24 * 60 * 60);
 
     return created({ key, url, filename: file.name, size: file.size });
   } catch (e) {

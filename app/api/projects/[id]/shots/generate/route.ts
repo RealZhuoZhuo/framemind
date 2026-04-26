@@ -3,6 +3,7 @@ import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-re
 import { getProjectScript } from "@/lib/ai/project-script";
 import { generateShotsFromScript } from "@/lib/ai/story-pipeline";
 import { assetRepo, projectRepo, shotRepo } from "@/lib/repositories";
+import { normalizeMediaStorageValue, withSignedShotMediaList } from "@/lib/storage/media-url";
 
 export async function POST(
   _request: Request,
@@ -31,11 +32,14 @@ export async function POST(
 
     const shots = [];
     for (const shot of generatedShots) {
-      const row = await shotRepo.create(id, shot);
+      const row = await shotRepo.create(id, {
+        ...shot,
+        mediaUrl: normalizeMediaStorageValue(shot.mediaUrl),
+      });
       shots.push(row);
     }
 
-    return ok(shots);
+    return ok(await withSignedShotMediaList(shots));
   } catch (e) {
     if (NoOutputGeneratedError.isInstance(e)) {
       return badRequest("AI did not return a valid storyboard JSON array. Retry or simplify the script content.");

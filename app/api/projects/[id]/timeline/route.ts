@@ -1,17 +1,19 @@
 import { videoClipRepo } from "@/lib/repositories";
 import { ok, created, serverError } from "@/app/api/_helpers/api-response";
+import { normalizeMediaStorageValue, withSignedMediaUrl, withSignedMediaUrls } from "@/lib/storage/media-url";
 import type { ClipType } from "@/lib/repositories/interfaces/video-clip.repository";
 import type { VideoClipRow } from "@/lib/db/types";
 
-function formatTimeline(clips: VideoClipRow[]) {
+async function formatTimeline(clips: VideoClipRow[]) {
+  const signedClips = await withSignedMediaUrls(clips);
   return {
-    videoClips: clips
+    videoClips: signedClips
       .filter((c) => c.clipType === "video")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label })),
-    subtitleClips: clips
+    subtitleClips: signedClips
       .filter((c) => c.clipType === "subtitle")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, text: c.subtitleText ?? "" })),
-    audioClips: clips
+    audioClips: signedClips
       .filter((c) => c.clipType === "audio")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, label: c.label })),
   };
@@ -24,7 +26,7 @@ export async function GET(
   try {
     const { id } = await params;
     const clips = await videoClipRepo.findByProject(id);
-    return ok(formatTimeline(clips));
+    return ok(await formatTimeline(clips));
   } catch (e) {
     return serverError(e);
   }
@@ -49,7 +51,7 @@ export async function PUT(
         clipType: "video" as ClipType,
         startSec: c.start,
         endSec: c.end,
-        mediaUrl: c.mediaUrl ?? null,
+        mediaUrl: normalizeMediaStorageValue(c.mediaUrl),
         label: c.label ?? "",
       })),
       ...subtitleClips.map((c: RawSubtitle) => ({
@@ -67,7 +69,7 @@ export async function PUT(
     ];
 
     const saved = await videoClipRepo.replaceAll(id, allClips);
-    return ok(formatTimeline(saved));
+    return ok(await formatTimeline(saved));
   } catch (e) {
     return serverError(e);
   }
@@ -81,8 +83,11 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const clip = await videoClipRepo.create(id, body);
-    return created(clip);
+    const clip = await videoClipRepo.create(id, {
+      ...body,
+      mediaUrl: normalizeMediaStorageValue(body.mediaUrl),
+    });
+    return created(await withSignedMediaUrl(clip));
   } catch (e) {
     return serverError(e);
   }

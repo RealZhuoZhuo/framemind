@@ -1,5 +1,6 @@
 import { videoClipRepo } from "@/lib/repositories";
 import { ok, notFound, noContent, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { normalizeMediaStorageValue, withSignedMediaUrl } from "@/lib/storage/media-url";
 import type { UpdateClipInput } from "@/lib/repositories/interfaces/video-clip.repository";
 
 export async function PATCH(
@@ -24,12 +25,12 @@ export async function PATCH(
       patch.endSec = body.endSec;
     }
     if (body.label !== undefined) patch.label = String(body.label);
-    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
+    if ("mediaUrl" in body) patch.mediaUrl = normalizeMediaStorageValue(body.mediaUrl);
     if ("subtitleText" in body) patch.subtitleText = body.subtitleText ?? null;
 
     const updated = await videoClipRepo.update(cid, patch);
     if (!updated) return notFound("Clip not found");
-    return ok(updated);
+    return ok(await withSignedMediaUrl(updated));
   } catch (e) {
     return serverError(e);
   }

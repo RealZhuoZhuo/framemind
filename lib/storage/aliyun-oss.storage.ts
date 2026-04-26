@@ -33,20 +33,12 @@ function normalizeEndpoint(endpoint: string) {
   return endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
-function normalizeBaseUrl(url: string) {
-  return url.replace(/\/+$/, "");
-}
-
 function encodeObjectKey(key: string) {
   return key.split("/").map(encodeURIComponent).join("/");
 }
 
 function hmacSha1Base64(secret: string, value: string) {
   return createHmac("sha1", secret).update(value, "utf8").digest("base64");
-}
-
-function isAliyunBucketEndpoint(host: string, bucket: string) {
-  return host.startsWith(`${bucket}.oss-`) && host.endsWith(".aliyuncs.com");
 }
 
 export class AliyunOssStorageService implements IStorageService {
@@ -56,7 +48,6 @@ export class AliyunOssStorageService implements IStorageService {
   private endpoint: string;
   private host: string;
   private protocol: "http" | "https";
-  private publicBaseUrl: string;
   private stsToken?: string;
 
   constructor() {
@@ -67,7 +58,6 @@ export class AliyunOssStorageService implements IStorageService {
     this.protocol = process.env.ALIYUN_OSS_USE_SSL === "false" ? "http" : "https";
     this.host = process.env.ALIYUN_OSS_CNAME === "true" ? this.endpoint : `${this.bucket}.${this.endpoint}`;
     this.stsToken = optionalEnv("ALIYUN_OSS_STS_TOKEN");
-    this.publicBaseUrl = this.resolvePublicBaseUrl();
   }
 
   async upload(key: string, buffer: Buffer, contentType: string): Promise<string> {
@@ -76,7 +66,7 @@ export class AliyunOssStorageService implements IStorageService {
       body: new Uint8Array(buffer),
     });
 
-    return `${this.publicBaseUrl}/${encodeObjectKey(key)}`;
+    return key;
   }
 
   async presign(key: string, ttlSeconds = 3600): Promise<string> {
@@ -103,22 +93,6 @@ export class AliyunOssStorageService implements IStorageService {
     await this.request("DELETE", key, {
       contentType: "",
     });
-  }
-
-  private resolvePublicBaseUrl() {
-    const fallback = `${this.protocol}://${this.bucket}.${this.endpoint}`;
-    const configured = optionalEnv("ALIYUN_OSS_PUBLIC_BASE_URL");
-    if (!configured) return fallback;
-
-    const normalized = normalizeBaseUrl(configured);
-    const host = new URL(normalized).host;
-    const expectedHost = `${this.bucket}.${this.endpoint}`;
-
-    if (isAliyunBucketEndpoint(host, this.bucket) && host !== expectedHost) {
-      return fallback;
-    }
-
-    return normalized;
   }
 
   private objectUrl(key: string) {

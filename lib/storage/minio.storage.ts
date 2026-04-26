@@ -5,7 +5,6 @@ import type { IStorageService } from "./interfaces/storage.interface";
 export class MinioStorageService implements IStorageService {
   private client: Client;
   private bucket: string;
-  private publicBaseUrl: string;
 
   constructor() {
     const endpoint = process.env.MINIO_ENDPOINT!;
@@ -21,8 +20,6 @@ export class MinioStorageService implements IStorageService {
     });
 
     this.bucket = process.env.MINIO_BUCKET!;
-    const protocol = useSSL ? "https" : "http";
-    this.publicBaseUrl = `${protocol}://${endpoint}:${port}/${this.bucket}`;
   }
 
   async upload(key: string, buffer: Buffer, contentType: string): Promise<string> {
@@ -33,7 +30,7 @@ export class MinioStorageService implements IStorageService {
       buffer.length,
       { "Content-Type": contentType }
     );
-    return `${this.publicBaseUrl}/${key}`;
+    return key;
   }
 
   async presign(key: string, ttlSeconds = 3600): Promise<string> {

@@ -1,5 +1,6 @@
 import { getImageGenerationProvider } from "@/lib/ai/image-generation-provider";
 import { getStorage } from "@/lib/storage";
+import { signMediaUrl } from "@/lib/storage/media-url";
 import type { AssetRow, ShotRow } from "@/lib/db/types";
 
 function assetTypeLabel(type: AssetRow["type"]) {
@@ -50,10 +51,12 @@ function extensionFromContentType(contentType: string) {
 
 export async function generateShotImageToStorage(shot: ShotRow, assets: AssetRow[]) {
   const referencedAssets = assets.filter((asset) => asset.mediaUrl);
-  const referenceImages = referencedAssets.map((asset) => ({
-    url: asset.mediaUrl as string,
-    label: asset.name,
-  }));
+  const referenceImages = await Promise.all(
+    referencedAssets.map(async (asset) => ({
+      url: (await signMediaUrl(asset.mediaUrl)) as string,
+      label: asset.name,
+    }))
+  );
   const prompt = buildShotImagePrompt(shot, assets, referencedAssets);
   const generated = await getImageGenerationProvider().generateImage({ prompt, referenceImages });
 

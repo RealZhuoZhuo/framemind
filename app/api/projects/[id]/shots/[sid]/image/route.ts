@@ -1,6 +1,7 @@
 import { generateShotImageToStorage } from "@/lib/ai/shot-image-generation";
 import { shotRepo } from "@/lib/repositories";
 import { notFound, ok, serverError } from "@/app/api/_helpers/api-response";
+import { withSignedShotMedia } from "@/lib/storage/media-url";
 
 export async function POST(
   _request: Request,
@@ -18,7 +19,7 @@ export async function POST(
     const updated = await shotRepo.update(sid, { mediaUrl });
     if (!updated) return notFound("Shot not found");
 
-    return ok(updated);
+    return ok(await withSignedShotMedia(updated));
   } catch (e) {
     return serverError(e);
   }

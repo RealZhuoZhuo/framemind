@@ -1,5 +1,6 @@
 import { assetRepo } from "@/lib/repositories";
 import { ok, notFound, noContent, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { normalizeMediaStorageValue, withSignedMediaUrl } from "@/lib/storage/media-url";
 import type { AssetType } from "@/lib/db/types";
 import type { UpdateAssetInput } from "@/lib/repositories/interfaces/asset.repository";
 
@@ -31,11 +32,11 @@ export async function PATCH(
     }
     if (body.appearance !== undefined) patch.appearance = String(body.appearance);
     if (body.description !== undefined) patch.description = String(body.description);
-    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
+    if ("mediaUrl" in body) patch.mediaUrl = normalizeMediaStorageValue(body.mediaUrl);
 
     const updated = await assetRepo.update(aid, patch);
     if (!updated) return notFound("Asset not found");
-    return ok(updated);
+    return ok(await withSignedMediaUrl(updated));
   } catch (e) {
     return serverError(e);
   }

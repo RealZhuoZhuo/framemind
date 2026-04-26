@@ -11,6 +11,7 @@ import {
   noContent,
   serverError,
 } from "@/app/api/_helpers/api-response";
+import { withSignedMediaUrls, withSignedShotMediaList } from "@/lib/storage/media-url";
 import type { StepKey } from "@/lib/repositories/interfaces/step.repository";
 
 export async function GET(
@@ -28,12 +29,17 @@ export async function GET(
       shotRepo.findByProject(id),
       videoClipRepo.findByProject(id),
     ]);
+    const [signedAssets, signedShots, signedClips] = await Promise.all([
+      withSignedMediaUrls(assets),
+      withSignedShotMediaList(shots),
+      withSignedMediaUrls(clips),
+    ]);
 
     const steps = Object.fromEntries(
       stepsRows.map((s) => [s.stepKey, { completed: s.completed, content: s.content }])
     ) as Record<StepKey, { completed: boolean; content: string }>;
 
-    const videoClips = clips
+    const videoClips = signedClips
       .filter((c) => c.clipType === "video")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label }));
 
@@ -48,8 +54,8 @@ export async function GET(
     return ok({
       ...project,
       steps,
-      assets,
-      shots,
+      assets: signedAssets,
+      shots: signedShots,
       timeline: { videoClips, subtitleClips, audioClips },
     });
   } catch (e) {

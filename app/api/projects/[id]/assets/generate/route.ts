@@ -3,6 +3,7 @@ import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-re
 import { extractAssetsFromScript } from "@/lib/ai/story-pipeline";
 import { getProjectScript } from "@/lib/ai/project-script";
 import { assetRepo, projectRepo } from "@/lib/repositories";
+import { normalizeMediaStorageValue, withSignedMediaUrls } from "@/lib/storage/media-url";
 
 export async function POST(
   _request: Request,
@@ -26,10 +27,15 @@ export async function POST(
 
     const assets = [];
     for (const asset of generatedAssets) {
-      assets.push(await assetRepo.create(id, asset));
+      assets.push(
+        await assetRepo.create(id, {
+          ...asset,
+          mediaUrl: normalizeMediaStorageValue(asset.mediaUrl),
+        })
+      );
     }
 
-    return ok(assets);
+    return ok(await withSignedMediaUrls(assets));
   } catch (e) {
     if (NoOutputGeneratedError.isInstance(e)) {
       return badRequest("AI did not return valid structured asset data. Retry or simplify the script content.");

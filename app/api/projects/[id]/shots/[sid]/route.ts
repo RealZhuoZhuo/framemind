@@ -1,5 +1,6 @@
 import { assetRepo, shotRepo } from "@/lib/repositories";
 import { ok, notFound, noContent, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { normalizeMediaStorageValue, withSignedShotMedia } from "@/lib/storage/media-url";
 import type { UpdateShotInput } from "@/lib/repositories/interfaces/shot.repository";
 
 async function normalizeProjectAssetIds(
@@ -46,7 +47,7 @@ export async function PATCH(
     if (body.dialogue !== undefined) patch.dialogue = String(body.dialogue);
     if (body.characterAction !== undefined) patch.characterAction = String(body.characterAction);
     if (body.lightingMood !== undefined) patch.lightingMood = String(body.lightingMood);
-    if ("mediaUrl" in body) patch.mediaUrl = body.mediaUrl ?? null;
+    if ("mediaUrl" in body) patch.mediaUrl = normalizeMediaStorageValue(body.mediaUrl);
     let normalizedAssetIds: string[] | undefined;
     let normalizedDialogueSpeakerIds: string[] | undefined;
     try {
@@ -70,9 +71,9 @@ export async function PATCH(
     if (normalizedAssetIds !== undefined || normalizedDialogueSpeakerIds !== undefined) {
       const refreshed = await shotRepo.findById(sid);
       if (!refreshed) return notFound("Shot not found");
-      return ok(refreshed);
+      return ok(await withSignedShotMedia(refreshed));
     }
-    return ok(updated);
+    return ok(await withSignedShotMedia(updated));
   } catch (e) {
     return serverError(e);
   }

@@ -1,6 +1,6 @@
 export interface IStorageService {
   /**
-   * Upload a file buffer and return its permanent public URL.
+   * Upload a file buffer and return its object key.
    * `key` is the full object path, e.g. "projects/{id}/scripts/draft.docx"
    */
   upload(key: string, buffer: Buffer, contentType: string): Promise<string>;

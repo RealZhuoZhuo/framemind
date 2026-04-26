@@ -1,6 +1,7 @@
 import { assetRepo } from "@/lib/repositories";
 import { generateAssetImageToStorage } from "@/lib/ai/asset-image-generation";
 import { notFound, ok, serverError } from "@/app/api/_helpers/api-response";
+import { withSignedMediaUrl } from "@/lib/storage/media-url";
 
 export async function POST(
   _request: Request,
@@ -17,7 +18,7 @@ export async function POST(
     const updated = await assetRepo.update(aid, { mediaUrl });
     if (!updated) return notFound("Asset not found");
 
-    return ok(updated);
+    return ok(await withSignedMediaUrl(updated));
   } catch (e) {
     return serverError(e);
   }

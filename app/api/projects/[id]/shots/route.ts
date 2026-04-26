@@ -1,5 +1,6 @@
 import { assetRepo, shotRepo } from "@/lib/repositories";
 import { ok, created, badRequest, serverError } from "@/app/api/_helpers/api-response";
+import { normalizeMediaStorageValue, withSignedShotMedia, withSignedShotMediaList } from "@/lib/storage/media-url";
 
 async function normalizeProjectAssetIds(
   projectId: string,
@@ -29,7 +30,7 @@ export async function GET(
   try {
     const { id } = await params;
     const shots = await shotRepo.findByProject(id);
-    return ok(shots);
+    return ok(await withSignedShotMediaList(shots));
   } catch (e) {
     return serverError(e);
   }
@@ -72,9 +73,9 @@ export async function POST(
       dialogue,
       characterAction,
       lightingMood,
-      mediaUrl: mediaUrl ?? null,
+      mediaUrl: normalizeMediaStorageValue(mediaUrl),
     });
-    return created(shot);
+    return created(await withSignedShotMedia(shot));
   } catch (e) {
     return serverError(e);
   }

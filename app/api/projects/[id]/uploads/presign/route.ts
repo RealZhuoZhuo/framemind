@@ -1,4 +1,5 @@
 import { getStorage } from "@/lib/storage";
+import { getStorageKeyFromMediaUrl } from "@/lib/storage/media-url";
 import { ok, badRequest, serverError } from "@/app/api/_helpers/api-response";
 
 export async function GET(
@@ -8,7 +9,7 @@ export async function GET(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const key = searchParams.get("key");
+    const key = getStorageKeyFromMediaUrl(searchParams.get("key")) ?? searchParams.get("key")?.trim();
 
     if (!key) return badRequest("key query parameter is required");
 
