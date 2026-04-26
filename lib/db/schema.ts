@@ -101,6 +101,23 @@ export const shotAssets = pgTable(
   ]
 );
 
+export const shotDialogueSpeakers = pgTable(
+  "shot_dialogue_speakers",
+  {
+    shotId: uuid("shot_id")
+      .notNull()
+      .references(() => shots.id, { onDelete: "cascade" }),
+    assetId: uuid("asset_id")
+      .notNull()
+      .references(() => projectAssets.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("shot_dialogue_speakers_unique_shot_asset").on(table.shotId, table.assetId),
+    index("shot_dialogue_speakers_shot_id_idx").on(table.shotId),
+    index("shot_dialogue_speakers_asset_id_idx").on(table.assetId),
+  ]
+);
+
 export const videoClips = pgTable(
   "video_clips",
   {

@@ -14,9 +14,12 @@ export type AssetInsert = InferInsertModel<typeof schema.projectAssets>;
 export type ShotRow = InferSelectModel<typeof schema.shots>;
 export type ShotInsert = InferInsertModel<typeof schema.shots>;
 export type ShotAssetRow = InferSelectModel<typeof schema.shotAssets>;
+export type ShotDialogueSpeakerRow = InferSelectModel<typeof schema.shotDialogueSpeakers>;
 export type ShotWithAssets = ShotRow & {
   assetIds: string[];
   assets: AssetRow[];
+  dialogueSpeakerIds: string[];
+  dialogueSpeakers: AssetRow[];
 };
 
 export type VideoClipRow = InferSelectModel<typeof schema.videoClips>;

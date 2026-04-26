@@ -1,13 +1,36 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
-import { projectAssets, shotAssets, shots } from "@/lib/db/schema";
-import { eq, inArray, max } from "drizzle-orm";
+import { projectAssets, shotAssets, shotDialogueSpeakers, shots } from "@/lib/db/schema";
+import { and, eq, inArray, max } from "drizzle-orm";
 import type {
   IShotRepository,
   CreateShotInput,
   UpdateShotInput,
 } from "../interfaces/shot.repository";
 import type { AssetRow, ShotRow, ShotWithAssets } from "@/lib/db/types";
+
+function normalizeAssetName(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function splitDialogueSpeakerNames(value: string | null | undefined) {
+  return [
+    ...new Set(
+      (value ?? "")
+        .split(/[、,，]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function uniqueAssets(assets: AssetRow[]) {
+  const byId = new Map<string, AssetRow>();
+  for (const asset of assets) {
+    byId.set(asset.id, asset);
+  }
+  return [...byId.values()];
+}
 
 export class ShotPostgresRepository implements IShotRepository {
   async findByProject(projectId: string): Promise<ShotWithAssets[]> {
@@ -55,11 +78,20 @@ export class ShotPostgresRepository implements IShotRepository {
     if (data.assetIds) {
       await this.setAssets(shot.id, data.assetIds);
     }
+    const dialogueSpeakerIds =
+      data.dialogueSpeakerIds ?? (await this.resolveDialogueSpeakerIds(projectId, data.dialogueSpeaker));
+    if (dialogueSpeakerIds.length > 0) {
+      await this.setDialogueSpeakers(shot.id, dialogueSpeakerIds);
+    }
     const withAssets = await this.attachAssets([shot]);
     return withAssets[0];
   }
 
   async update(id: string, data: UpdateShotInput): Promise<ShotWithAssets | null> {
+    if (Object.keys(data).length === 0) {
+      return this.findById(id);
+    }
+
     const rows = await db
       .update(shots)
       .set(data)
@@ -93,12 +125,59 @@ export class ShotPostgresRepository implements IShotRepository {
     );
   }
 
+  async setDialogueSpeakers(shotId: string, assetIds: string[]): Promise<void> {
+    await db.delete(shotDialogueSpeakers).where(eq(shotDialogueSpeakers.shotId, shotId));
+
+    const uniqueAssetIds = [...new Set(assetIds.filter(Boolean))];
+    if (uniqueAssetIds.length === 0) {
+      await db.update(shots).set({ dialogueSpeaker: "" }).where(eq(shots.id, shotId));
+      return;
+    }
+
+    const speakerAssets = await db
+      .select()
+      .from(projectAssets)
+      .where(and(inArray(projectAssets.id, uniqueAssetIds), eq(projectAssets.type, "character")));
+    const speakerById = new Map(speakerAssets.map((asset) => [asset.id, asset]));
+    const orderedSpeakerAssets = uniqueAssetIds
+      .map((assetId) => speakerById.get(assetId))
+      .filter((asset): asset is typeof speakerAssets[number] => Boolean(asset));
+
+    if (orderedSpeakerAssets.length === 0) {
+      await db.update(shots).set({ dialogueSpeaker: "" }).where(eq(shots.id, shotId));
+      return;
+    }
+
+    await db.insert(shotDialogueSpeakers).values(
+      orderedSpeakerAssets.map((asset) => ({
+        shotId,
+        assetId: asset.id,
+      }))
+    );
+
+    await db
+      .update(shots)
+      .set({ dialogueSpeaker: orderedSpeakerAssets.map((asset) => asset.name).join("、") })
+      .where(eq(shots.id, shotId));
+  }
+
   async findAssetsByShot(shotId: string): Promise<AssetRow[]> {
-    const rows = await db
+    const assetRows = await db
       .select({ asset: projectAssets })
       .from(shotAssets)
       .innerJoin(projectAssets, eq(shotAssets.assetId, projectAssets.id))
       .where(eq(shotAssets.shotId, shotId));
+    const speakerAssets = await this.findDialogueSpeakersByShot(shotId);
+
+    return uniqueAssets([...assetRows.map((row) => row.asset as AssetRow), ...speakerAssets]);
+  }
+
+  async findDialogueSpeakersByShot(shotId: string): Promise<AssetRow[]> {
+    const rows = await db
+      .select({ asset: projectAssets })
+      .from(shotDialogueSpeakers)
+      .innerJoin(projectAssets, eq(shotDialogueSpeakers.assetId, projectAssets.id))
+      .where(eq(shotDialogueSpeakers.shotId, shotId));
     return rows.map((row) => row.asset as AssetRow);
   }
 
@@ -111,6 +190,11 @@ export class ShotPostgresRepository implements IShotRepository {
       .from(shotAssets)
       .innerJoin(projectAssets, eq(shotAssets.assetId, projectAssets.id))
       .where(inArray(shotAssets.shotId, shotIds));
+    const joinedDialogueSpeakers = await db
+      .select({ shotId: shotDialogueSpeakers.shotId, asset: projectAssets })
+      .from(shotDialogueSpeakers)
+      .innerJoin(projectAssets, eq(shotDialogueSpeakers.assetId, projectAssets.id))
+      .where(inArray(shotDialogueSpeakers.shotId, shotIds));
 
     const byShot = new Map<string, AssetRow[]>();
     for (const row of joined) {
@@ -119,13 +203,60 @@ export class ShotPostgresRepository implements IShotRepository {
       byShot.set(row.shotId, list);
     }
 
+    const speakersByShot = new Map<string, AssetRow[]>();
+    for (const row of joinedDialogueSpeakers) {
+      const list = speakersByShot.get(row.shotId) ?? [];
+      list.push(row.asset as AssetRow);
+      speakersByShot.set(row.shotId, list);
+    }
+
     return rows.map((shot) => {
       const assets = byShot.get(shot.id) ?? [];
+      const dialogueSpeakers = speakersByShot.get(shot.id) ?? [];
+      const dialogueSpeaker = dialogueSpeakers.length > 0
+        ? dialogueSpeakers.map((asset) => asset.name).join("、")
+        : shot.dialogueSpeaker;
       return {
         ...shot,
+        dialogueSpeaker,
         assetIds: assets.map((asset) => asset.id),
         assets,
+        dialogueSpeakerIds: dialogueSpeakers.map((asset) => asset.id),
+        dialogueSpeakers,
       };
     });
+  }
+
+  private async resolveDialogueSpeakerIds(
+    projectId: string,
+    dialogueSpeaker: string | null | undefined
+  ): Promise<string[]> {
+    const names = splitDialogueSpeakerNames(dialogueSpeaker);
+    if (names.length === 0) return [];
+
+    const assets = await db
+      .select()
+      .from(projectAssets)
+      .where(and(eq(projectAssets.projectId, projectId), eq(projectAssets.type, "character")));
+
+    const resolved = new Set<string>();
+    for (const name of names) {
+      const normalized = normalizeAssetName(name);
+      if (!normalized) continue;
+
+      const exactMatch = assets.find((asset) => normalizeAssetName(asset.name) === normalized);
+      if (exactMatch) {
+        resolved.add(exactMatch.id);
+        continue;
+      }
+
+      const looseMatch = assets.find((asset) => {
+        const normalizedAssetName = normalizeAssetName(asset.name);
+        return normalizedAssetName.includes(normalized) || normalized.includes(normalizedAssetName);
+      });
+      if (looseMatch) resolved.add(looseMatch.id);
+    }
+
+    return [...resolved];
   }
 }

@@ -115,13 +115,6 @@ function AssetTagsCell({
   );
 }
 
-function splitDialogueSpeakers(value: string) {
-  return value
-    .split(/[、,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function DialogueCell({
   shot,
   assets,
@@ -133,14 +126,22 @@ function DialogueCell({
 }) {
   const [open, setOpen] = useState(false);
   const characterAssets = assets.filter((asset) => asset.type === "character");
-  const selectedSpeakers = splitDialogueSpeakers(shot.dialogueSpeaker);
-  const selectedSpeakerSet = new Set(selectedSpeakers);
+  const selectedSpeakerIds = shot.dialogueSpeakerIds ?? [];
+  const selectedSpeakerIdSet = new Set(selectedSpeakerIds);
+  const selectedSpeakers = characterAssets.filter((asset) => selectedSpeakerIdSet.has(asset.id));
+  const fallbackSpeakerNames = shot.dialogueSpeaker
+    .split(/[、,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-  const toggleSpeaker = (name: string) => {
-    const next = selectedSpeakerSet.has(name)
-      ? selectedSpeakers.filter((speaker) => speaker !== name)
-      : [...selectedSpeakers, name];
-    onChange({ dialogueSpeaker: next.join("、") });
+  const toggleSpeaker = (asset: Asset) => {
+    const nextIds = selectedSpeakerIdSet.has(asset.id)
+      ? selectedSpeakerIds.filter((speakerId) => speakerId !== asset.id)
+      : [...selectedSpeakerIds, asset.id];
+    const nextNames = characterAssets
+      .filter((candidate) => nextIds.includes(candidate.id))
+      .map((candidate) => candidate.name);
+    onChange({ dialogueSpeakerIds: nextIds, dialogueSpeaker: nextNames.join("、") });
   };
 
   return (
@@ -152,7 +153,13 @@ function DialogueCell({
       >
         {selectedSpeakers.length > 0 ? (
           selectedSpeakers.map((speaker) => (
-            <span key={speaker} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
+            <span key={speaker.id} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
+              角色 · {speaker.name}
+            </span>
+          ))
+        ) : fallbackSpeakerNames.length > 0 ? (
+          fallbackSpeakerNames.map((speaker) => (
+            <span key={speaker} className="max-w-full truncate rounded border border-yellow-400/20 bg-yellow-400/10 px-1.5 py-0.5 text-[10px] text-yellow-100/80">
               角色 · {speaker}
             </span>
           ))
@@ -168,8 +175,8 @@ function DialogueCell({
               <label key={asset.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/65 hover:bg-white/6">
                 <input
                   type="checkbox"
-                  checked={selectedSpeakerSet.has(asset.name)}
-                  onChange={() => toggleSpeaker(asset.name)}
+                  checked={selectedSpeakerIdSet.has(asset.id)}
+                  onChange={() => toggleSpeaker(asset)}
                   className="h-3.5 w-3.5 accent-green-500"
                 />
                 <span className="shrink-0 text-white/35">角色</span>

@@ -8,7 +8,9 @@ export interface IShotRepository {
   delete(id: string): Promise<void>;
   deleteByProject(projectId: string): Promise<void>;
   setAssets(shotId: string, assetIds: string[]): Promise<void>;
+  setDialogueSpeakers(shotId: string, assetIds: string[]): Promise<void>;
   findAssetsByShot(shotId: string): Promise<ShotWithAssets["assets"]>;
+  findDialogueSpeakersByShot(shotId: string): Promise<ShotWithAssets["dialogueSpeakers"]>;
 }
 
 export type CreateShotInput = {
@@ -16,6 +18,7 @@ export type CreateShotInput = {
   sceneType?: string;
   shotDescription?: string;
   assetIds?: string[];
+  dialogueSpeakerIds?: string[];
   dialogueSpeaker?: string;
   dialogue?: string;
   characterAction?: string;
@@ -23,4 +26,4 @@ export type CreateShotInput = {
   mediaUrl?: string | null;
 };
 
-export type UpdateShotInput = Partial<Omit<CreateShotInput, "assetIds">>;
+export type UpdateShotInput = Partial<Omit<CreateShotInput, "assetIds" | "dialogueSpeakerIds">>;

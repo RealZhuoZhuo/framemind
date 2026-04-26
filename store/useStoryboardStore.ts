@@ -21,6 +21,8 @@ export type Shot = {
   sceneType: SceneType;
   assetIds: string[];
   assets: ShotAsset[];
+  dialogueSpeakerIds: string[];
+  dialogueSpeakers: ShotAsset[];
   shotDescription: string;
   dialogueSpeaker: string;
   dialogue: string;
