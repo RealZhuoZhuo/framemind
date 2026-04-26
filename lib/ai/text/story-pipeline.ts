@@ -1,6 +1,6 @@
 import { NoOutputGeneratedError, generateText, Output } from "ai";
 import { z } from "zod";
-import type { AssetRow, AssetType } from "@/lib/db/types";
+import type { AssetRow } from "@/lib/db/types";
 import { SCENE_TYPES } from "@/lib/storyboard/constants";
 import { getStructuredOutputModel, getStructuredOutputTimeout } from "./model";
 import {
@@ -10,6 +10,11 @@ import {
   getShotGenerationUserPrompt,
 } from "./prompts";
 import { mergeDistinctText, normalizeName, splitScriptIntoChunks } from "./script-utils";
+import type {
+  GeneratedAssetRow,
+  GeneratedShotRow,
+  ITextGenerationService,
+} from "./interfaces/text-generation.interface";
 
 const generatedAssetOutputSchema = z.object({
   type: z.enum(["character", "scene", "prop"]),
@@ -21,13 +26,6 @@ const generatedAssetOutputSchema = z.object({
 
 type GeneratedAssetOutput = z.infer<typeof generatedAssetOutputSchema>;
 type GeneratedShotDraftOutput = Record<string, unknown>;
-export type GeneratedAssetRow = {
-  type: AssetType;
-  name: string;
-  appearance: string;
-  description: string;
-  mediaUrl: string;
-};
 type GeneratedShotDraft = {
   sceneType?: string | null;
   assetNames?: string[];
@@ -36,17 +34,6 @@ type GeneratedShotDraft = {
   dialogue?: string;
   characterAction?: string;
   lightingMood?: string;
-};
-export type GeneratedShotRow = {
-  shotNumber: number;
-  sceneType: (typeof SCENE_TYPES)[number] | "";
-  assetIds: string[];
-  shotDescription: string;
-  dialogueSpeaker: string;
-  dialogue: string;
-  characterAction: string;
-  lightingMood: string;
-  mediaUrl: string;
 };
 
 const ASSET_NAME_MAX_LENGTH = 100;
@@ -432,7 +419,7 @@ async function generateStructuredShotDrafts(params: {
   });
 }
 
-export async function extractAssetsFromScript(script: string): Promise<GeneratedAssetRow[]> {
+async function extractAssetsFromScript(script: string): Promise<GeneratedAssetRow[]> {
   const chunks = splitScriptIntoChunks(script);
   const deduped = new Map<string, GeneratedAssetRow>();
 
@@ -476,7 +463,7 @@ export async function extractAssetsFromScript(script: string): Promise<Generated
   return [...deduped.values()];
 }
 
-export async function generateShotsFromScript(
+async function generateShotsFromScript(
   script: string,
   assets: AssetRow[]
 ): Promise<GeneratedShotRow[]> {
@@ -510,4 +497,14 @@ export async function generateShotsFromScript(
   }
 
   return generatedShots;
+}
+
+export class StoryPipelineTextGenerationService implements ITextGenerationService {
+  extractAssetsFromScript(script: string): Promise<GeneratedAssetRow[]> {
+    return extractAssetsFromScript(script);
+  }
+
+  generateShotsFromScript(script: string, assets: AssetRow[]): Promise<GeneratedShotRow[]> {
+    return generateShotsFromScript(script, assets);
+  }
 }

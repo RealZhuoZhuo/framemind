@@ -1,5 +1,5 @@
 import { ArkSeedanceVideoGenerationProvider } from "./ark-seedance-video-generation";
-import type { IVideoGenerationProvider } from "./generation.interface";
+import type { IVideoGenerationProvider } from "./interfaces/video-generation.interface";
 
 export function getVideoGenerationProvider(): IVideoGenerationProvider {
   const provider = process.env.VIDEO_GENERATION_PROVIDER?.trim() || "ark-seedance";

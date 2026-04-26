@@ -2,7 +2,7 @@ import type {
   IImageGenerationProvider,
   ImageGenerationInput,
   ImageGenerationOutput,
-} from "./generation.interface";
+} from "./interfaces/image-generation.interface";
 
 const DEFAULT_ARK_IMAGE_MODEL = "ep-20260313204854-n5jb5";
 const DEFAULT_ARK_IMAGE_ENDPOINT = "https://ark.cn-beijing.volces.com/api/v3/images/generations";

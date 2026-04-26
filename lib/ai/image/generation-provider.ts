@@ -1,5 +1,5 @@
 import { ArkImageGenerationProvider } from "./ark-image-generation";
-import type { IImageGenerationProvider } from "./generation.interface";
+import type { IImageGenerationProvider } from "./interfaces/image-generation.interface";
 
 export function getImageGenerationProvider(): IImageGenerationProvider {
   const provider = process.env.IMAGE_GENERATION_PROVIDER?.trim() || "ark";

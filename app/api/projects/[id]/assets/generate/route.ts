@@ -1,6 +1,6 @@
 import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
-import { extractAssetsFromScript, getProjectScript } from "@/lib/ai/text";
+import { getProjectScript, getTextGenerationService } from "@/lib/ai/text";
 import { assetRepo, projectRepo } from "@/lib/repositories";
 import { normalizeMediaStorageValue, withSignedMediaUrls } from "@/lib/storage/media-url";
 
@@ -17,7 +17,7 @@ export async function POST(
     if (script === null) return notFound("Project not found");
     if (!script.trim()) return badRequest("Project script is empty");
 
-    const generatedAssets = await extractAssetsFromScript(script);
+    const generatedAssets = await getTextGenerationService().extractAssetsFromScript(script);
     if (generatedAssets.length === 0) {
       return badRequest("No reusable project assets could be extracted from the script");
     }

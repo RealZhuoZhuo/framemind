@@ -1,6 +1,6 @@
 import { NoOutputGeneratedError } from "ai";
 import { ok, badRequest, notFound, serverError } from "@/app/api/_helpers/api-response";
-import { generateShotsFromScript, getProjectScript } from "@/lib/ai/text";
+import { getProjectScript, getTextGenerationService } from "@/lib/ai/text";
 import { assetRepo, projectRepo, shotRepo } from "@/lib/repositories";
 import { normalizeMediaStorageValue, withSignedShotMediaList } from "@/lib/storage/media-url";
 
@@ -22,7 +22,7 @@ export async function POST(
       return badRequest("Generate assets before generating storyboard shots");
     }
 
-    const generatedShots = await generateShotsFromScript(script, assets);
+    const generatedShots = await getTextGenerationService().generateShotsFromScript(script, assets);
     if (generatedShots.length === 0) {
       return badRequest("No storyboard shots could be generated from the script");
     }

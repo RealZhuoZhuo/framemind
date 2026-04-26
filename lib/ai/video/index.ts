@@ -1,3 +1,3 @@
 export { getVideoGenerationProvider } from "./generation-provider";
 export { buildShotVideoPrompt } from "./prompts";
-export type * from "./generation.interface";
+export type * from "./interfaces/video-generation.interface";

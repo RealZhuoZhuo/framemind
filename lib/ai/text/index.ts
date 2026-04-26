@@ -1,3 +1,4 @@
 export { getProjectScript } from "./project-script";
-export { extractAssetsFromScript, generateShotsFromScript } from "./story-pipeline";
-export type { GeneratedAssetRow, GeneratedShotRow } from "./story-pipeline";
+export { getTextGenerationService } from "./generation-service";
+export { StoryPipelineTextGenerationService } from "./story-pipeline";
+export type * from "./interfaces/text-generation.interface";
