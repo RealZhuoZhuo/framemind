@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ImageIcon, Images, GripVertical, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImageIcon, Images, GripVertical, MoreHorizontal, Sparkles, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
@@ -31,18 +31,47 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 function ImageCell({
   shot,
   onGenerate,
+  onGenerateVideo,
   onPreview,
   isGenerating,
+  isGeneratingVideo,
 }: {
   shot: Shot;
   onGenerate: () => void;
+  onGenerateVideo: () => void;
   onPreview: () => void;
   isGenerating: boolean;
+  isGeneratingVideo: boolean;
 }) {
   const mediaKind = shot.mediaUrl ? getMediaPreviewKind(shot.mediaUrl) : "image";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handler = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
+  const handleImageAction = () => {
+    setMenuOpen(false);
+    onGenerate();
+  };
+
+  const handleVideoAction = () => {
+    setMenuOpen(false);
+    onGenerateVideo();
+  };
 
   return (
-    <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-[#0d0d0d]">
+    <div className="group relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-[#0d0d0d]">
       {shot.mediaUrl ? (
         <>
           <button
@@ -68,6 +97,46 @@ function ImageCell({
           <span className="text-[10px]">{isGenerating ? "生成中…" : "生成画面"}</span>
         </button>
       )}
+
+      <div
+        ref={menuRef}
+        className={cn(
+          "absolute left-1.5 top-1.5 z-20 transition-opacity",
+          menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setMenuOpen((value) => !value)}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-white/20 bg-black/70 text-white/85 shadow-lg shadow-black/40 backdrop-blur transition-colors hover:border-green-400/50 hover:bg-black/85 hover:text-green-200"
+          aria-label={`打开镜头 ${shot.shotNumber} 生成菜单`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+
+        {menuOpen ? (
+          <div className="absolute left-0 top-8 min-w-[136px] rounded-xl border border-white/10 bg-[#1e1e1e] py-1 shadow-xl">
+            <button
+              type="button"
+              onClick={handleImageAction}
+              disabled={isGenerating}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-white/70 transition-colors hover:bg-white/6 hover:text-white disabled:opacity-40"
+            >
+              <ImageIcon className="h-3.5 w-3.5" />
+              图片生成
+            </button>
+            <button
+              type="button"
+              onClick={handleVideoAction}
+              disabled={!shot.mediaUrl || isGeneratingVideo}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-white/70 transition-colors hover:bg-white/6 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Video className="h-3.5 w-3.5" />
+              视频生成
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -220,21 +289,66 @@ function DialogueCell({
 function ShotRow({
   shot,
   onPreviewMedia,
+  onGenerationError,
+  onVideoTaskCreated,
 }: {
   shot: Shot;
   onPreviewMedia: (media: { url: string; title: string; kind: MediaPreviewKind }) => void;
+  onGenerationError: (message: string) => void;
+  onVideoTaskCreated: (message: string) => void;
 }) {
   const { updateShot, generateShotImage } = useStoryboardStore();
+  const projectId = useStoryboardStore((state) => state.projectId);
   const { assets } = useAssetStore();
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const up = (patch: Partial<Shot>) => updateShot(shot.id, patch);
 
   const handleGenerateImage = async () => {
     setIsGeneratingImage(true);
     try {
       await generateShotImage(shot.id);
+    } catch (error) {
+      onGenerationError(error instanceof Error ? error.message : "分镜图生成失败");
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!projectId) return;
+
+    setIsGeneratingVideo(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/shots/${shot.id}/video`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload &&
+            typeof payload === "object" &&
+            "error" in payload &&
+            typeof payload.error === "string"
+            ? payload.error
+            : "视频生成任务创建失败"
+        );
+      }
+
+      const taskId =
+        payload &&
+        typeof payload === "object" &&
+        "taskId" in payload &&
+        typeof payload.taskId === "string"
+          ? payload.taskId
+          : "";
+
+      onVideoTaskCreated(taskId ? `镜头 ${shot.shotNumber} 视频任务已创建：${taskId}` : `镜头 ${shot.shotNumber} 视频任务已创建`);
+    } catch (error) {
+      onGenerationError(error instanceof Error ? error.message : "视频生成任务创建失败");
+    } finally {
+      setIsGeneratingVideo(false);
     }
   };
 
@@ -251,6 +365,7 @@ function ShotRow({
         <ImageCell
           shot={shot}
           onGenerate={handleGenerateImage}
+          onGenerateVideo={handleGenerateVideo}
           onPreview={() => {
             if (!shot.mediaUrl) return;
             onPreviewMedia({
@@ -260,6 +375,7 @@ function ShotRow({
             });
           }}
           isGenerating={isGeneratingImage}
+          isGeneratingVideo={isGeneratingVideo}
         />
       </td>
 
@@ -347,6 +463,7 @@ export default function StoryboardTable() {
   } = useStoryboardStore();
   const initAssets = useAssetStore((s) => s.init);
   const [generateError, setGenerateError] = useState("");
+  const [generateNotice, setGenerateNotice] = useState("");
   const [preview, setPreview] = useState<{ url: string; title: string; kind: MediaPreviewKind } | null>(null);
 
   useEffect(() => {
@@ -358,6 +475,7 @@ export default function StoryboardTable() {
   const handleGenerateShots = async () => {
     if (!projectId) return;
     setGenerateError("");
+    setGenerateNotice("");
     try {
       await generateShots(projectId);
     } catch (error) {
@@ -367,6 +485,7 @@ export default function StoryboardTable() {
 
   const handleGenerateAllShotImages = async () => {
     setGenerateError("");
+    setGenerateNotice("");
     try {
       await generateAllShotImages();
     } catch (error) {
@@ -414,6 +533,12 @@ export default function StoryboardTable() {
         </div>
       ) : null}
 
+      {generateNotice ? (
+        <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2 text-xs text-green-200">
+          {generateNotice}
+        </div>
+      ) : null}
+
       <div className="overflow-auto rounded-xl border border-white/8">
         <table className="min-w-[1400px] w-full table-fixed border-collapse">
           <thead>
@@ -433,7 +558,19 @@ export default function StoryboardTable() {
           </thead>
           <tbody>
             {shots.map((shot) => (
-              <ShotRow key={shot.id} shot={shot} onPreviewMedia={setPreview} />
+              <ShotRow
+                key={shot.id}
+                shot={shot}
+                onPreviewMedia={setPreview}
+                onGenerationError={(message) => {
+                  setGenerateNotice("");
+                  setGenerateError(message);
+                }}
+                onVideoTaskCreated={(message) => {
+                  setGenerateError("");
+                  setGenerateNotice(message);
+                }}
+              />
             ))}
           </tbody>
         </table>

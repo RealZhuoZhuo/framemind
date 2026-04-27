@@ -190,7 +190,10 @@ function AssetCard({
   return (
     <div className={cn("relative flex flex-col overflow-hidden rounded-lg border-2 bg-[#111] transition-all duration-200 hover:shadow-lg hover:shadow-black/40", asset.borderColor)}>
       <div ref={menuRef} className="absolute right-2.5 top-2.5 z-10">
-        <button onClick={() => setMenuOpen((v) => !v)} className="flex h-7 w-7 items-center justify-center rounded-md text-white/30 hover:bg-white/10 hover:text-white/70">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-white/20 bg-black/70 text-white/85 shadow-lg shadow-black/40 backdrop-blur transition-colors hover:border-green-400/50 hover:bg-black/85 hover:text-green-200"
+        >
           <MoreHorizontal className="h-4 w-4" />
         </button>
         {menuOpen ? (
