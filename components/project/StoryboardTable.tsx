@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageIcon, Images, Download, GripVertical, Sparkles, Video } from "lucide-react";
+import { ImageIcon, Images, GripVertical, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
@@ -40,7 +40,6 @@ function ImageCell({
   isGenerating: boolean;
 }) {
   const mediaKind = shot.mediaUrl ? getMediaPreviewKind(shot.mediaUrl) : "image";
-  const MediaIcon = mediaKind === "video" ? Video : ImageIcon;
 
   return (
     <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-[#0d0d0d]">
@@ -53,16 +52,10 @@ function ImageCell({
             aria-label={`预览镜头 ${shot.shotNumber}`}
           >
             {mediaKind === "video" ? (
-              <video src={shot.mediaUrl} muted preload="metadata" className="h-full w-full object-contain" />
+              <video src={shot.mediaUrl} muted preload="metadata" className="h-full w-full object-cover" />
             ) : (
-              <img src={shot.mediaUrl} alt={`镜头 ${shot.shotNumber}`} className="h-full w-full object-contain" />
+              <img src={shot.mediaUrl} alt={`镜头 ${shot.shotNumber}`} className="h-full w-full object-cover" />
             )}
-          </button>
-          <div className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5">
-            <MediaIcon className="h-3 w-3 text-white/60" />
-          </div>
-          <button className="absolute bottom-1.5 right-1.5 rounded bg-black/60 p-1 text-white/40 transition-colors hover:text-white">
-            <Download className="h-3 w-3" />
           </button>
         </>
       ) : (
