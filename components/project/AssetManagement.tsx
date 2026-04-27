@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
-import { Box, Building2, Images, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, UserCircle2, X } from "lucide-react";
+import { Box, Building2, Images, MoreHorizontal, Pencil, Plus, Trash2, UserCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
 import { MediaPreviewModal } from "@/components/project/MediaPreviewModal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   character: "角色",
@@ -132,13 +139,18 @@ function EditAssetModal({
 
           <div className="flex w-1/2 flex-col gap-4 overflow-y-auto px-7 py-6">
             <Field label="类型">
-              <select value={form.type} onChange={(e) => set("type", e.target.value)} className={inputCls}>
-                {ASSET_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#161616]">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.type} onValueChange={(value) => set("type", value as AssetType)}>
+                <SelectTrigger className={inputCls}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ASSET_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="名称">
               <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} />
@@ -252,7 +264,6 @@ export default function AssetManagement() {
     addAsset,
     updateAsset,
     removeAsset,
-    generateAssets,
     generateAssetImage,
     generateAllAssetImages,
   } = useAssetStore();
@@ -268,16 +279,6 @@ export default function AssetManagement() {
 
   const editingAsset = assets.find((asset) => asset.id === editingId) ?? null;
   const visibleAssets = filter === "all" ? assets : assets.filter((asset) => asset.type === filter);
-
-  const handleGenerateAssets = async () => {
-    if (!projectId) return;
-    setGenerateError("");
-    try {
-      await generateAssets(projectId);
-    } catch (error) {
-      setGenerateError(error instanceof Error ? error.message : "资产提取失败");
-    }
-  };
 
   const handleGenerateAllAssetImages = async () => {
     setGenerateError("");
@@ -312,10 +313,6 @@ export default function AssetManagement() {
             {isGeneratingAllImages
               ? `生成 ${imageGenerationProgress.completed}/${imageGenerationProgress.total}`
               : "生成全部参考图"}
-          </button>
-          <button onClick={() => { handleGenerateAssets(); }} disabled={!projectId || isLoading || isGeneratingAllImages} className="flex h-9 items-center gap-2 rounded-lg bg-green-500/15 px-4 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-40">
-            <Sparkles className="h-3.5 w-3.5" />
-            {isLoading ? "提取中…" : "AI提取资产"}
           </button>
         </div>
       </div>

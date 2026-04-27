@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImageIcon, Images, GripVertical, MoreHorizontal, Sparkles, Video } from "lucide-react";
+import { ImageIcon, Images, GripVertical, MoreHorizontal, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect, MultiSelectTag } from "@/components/ui/multi-select";
 
 const SCENE_OPTIONS = SCENE_TYPES.map((v) => ({ label: v, value: v }));
 const EMPTY_LABEL = <span className="text-white/30">无</span>;
@@ -27,6 +28,33 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   scene: "场景",
   prop: "道具",
 };
+const TABLE_SELECT_TRIGGER_CLASS =
+  "min-h-[34px] rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 hover:border-white/20 hover:bg-white/8";
+
+async function createShotVideoTask(projectId: string, shotId: string) {
+  const response = await fetch(`/api/projects/${projectId}/shots/${shotId}/video`, {
+    method: "POST",
+  });
+  const payload: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+        ? payload.error
+        : "视频生成任务创建失败"
+    );
+  }
+
+  return payload &&
+    typeof payload === "object" &&
+    "taskId" in payload &&
+    typeof payload.taskId === "string"
+    ? payload.taskId
+    : "";
+}
 
 function ImageCell({
   shot,
@@ -150,55 +178,33 @@ function AssetTagsCell({
   assets: Asset[];
   onChange: (assetIds: string[]) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const selectedAssets = assets.filter((asset) => shot.assetIds.includes(asset.id));
-
-  const toggleAsset = (assetId: string) => {
-    const next = shot.assetIds.includes(assetId)
-      ? shot.assetIds.filter((id) => id !== assetId)
-      : [...shot.assetIds, assetId];
-    onChange(next);
-  };
+  const options = assets.map((asset) => ({
+    value: asset.id,
+    label: asset.name,
+    meta: ASSET_TYPE_LABELS[asset.type],
+    selectedLabel: `${ASSET_TYPE_LABELS[asset.type]} · ${asset.name}`,
+  }));
+  const selectedContent =
+    selectedAssets.length > 0
+      ? selectedAssets.map((asset) => (
+          <MultiSelectTag key={asset.id}>
+            {ASSET_TYPE_LABELS[asset.type]} · {asset.name}
+          </MultiSelectTag>
+        ))
+      : undefined;
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex min-h-[34px] w-full flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-left text-xs text-white/60 hover:border-white/20 hover:bg-white/8"
-      >
-        {selectedAssets.length > 0 ? (
-          selectedAssets.map((asset) => (
-            <span key={asset.id} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
-              {ASSET_TYPE_LABELS[asset.type]} · {asset.name}
-            </span>
-          ))
-        ) : (
-          <span className="text-white/30">无</span>
-        )}
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-20 max-h-72 w-64 overflow-auto rounded-lg border border-white/10 bg-[#1b1b1b] p-1.5 shadow-xl">
-          {assets.length > 0 ? (
-            assets.map((asset) => (
-              <label key={asset.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/65 hover:bg-white/6">
-                <input
-                  type="checkbox"
-                  checked={shot.assetIds.includes(asset.id)}
-                  onChange={() => toggleAsset(asset.id)}
-                  className="h-3.5 w-3.5 accent-green-500"
-                />
-                <span className="shrink-0 text-white/35">{ASSET_TYPE_LABELS[asset.type]}</span>
-                <span className="truncate">{asset.name}</span>
-              </label>
-            ))
-          ) : (
-            <div className="px-2 py-4 text-center text-xs text-white/30">暂无资产</div>
-          )}
-        </div>
-      ) : null}
-    </div>
+    <MultiSelect
+      value={shot.assetIds}
+      options={options}
+      onValueChange={onChange}
+      selectedContent={selectedContent}
+      emptyText="暂无资产"
+      triggerClassName={TABLE_SELECT_TRIGGER_CLASS}
+      contentClassName="w-64"
+      ariaLabel={`选择镜头 ${shot.shotNumber} 资产`}
+    />
   );
 }
 
@@ -211,7 +217,6 @@ function DialogueCell({
   assets: Asset[];
   onChange: (patch: Partial<Shot>) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const characterAssets = assets.filter((asset) => asset.type === "character");
   const selectedSpeakerIds = shot.dialogueSpeakerIds ?? [];
   const selectedSpeakerIdSet = new Set(selectedSpeakerIds);
@@ -220,11 +225,29 @@ function DialogueCell({
     .split(/[、,，]/)
     .map((item) => item.trim())
     .filter(Boolean);
+  const options = characterAssets.map((asset) => ({
+    value: asset.id,
+    label: asset.name,
+    meta: "角色",
+    selectedLabel: `角色 · ${asset.name}`,
+  }));
+  const selectedContent =
+    selectedSpeakers.length > 0
+      ? selectedSpeakers.map((speaker) => (
+          <MultiSelectTag key={speaker.id}>角色 · {speaker.name}</MultiSelectTag>
+        ))
+      : fallbackSpeakerNames.length > 0
+        ? fallbackSpeakerNames.map((speaker) => (
+            <MultiSelectTag
+              key={speaker}
+              className="border-yellow-400/20 bg-yellow-400/10 text-yellow-100/80"
+            >
+              角色 · {speaker}
+            </MultiSelectTag>
+          ))
+        : undefined;
 
-  const toggleSpeaker = (asset: Asset) => {
-    const nextIds = selectedSpeakerIdSet.has(asset.id)
-      ? selectedSpeakerIds.filter((speakerId) => speakerId !== asset.id)
-      : [...selectedSpeakerIds, asset.id];
+  const handleSpeakerIdsChange = (nextIds: string[]) => {
     const nextNames = characterAssets
       .filter((candidate) => nextIds.includes(candidate.id))
       .map((candidate) => candidate.name);
@@ -233,48 +256,16 @@ function DialogueCell({
 
   return (
     <div className="relative flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex min-h-[34px] w-full flex-wrap items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-left text-xs text-white/60 hover:border-white/20 hover:bg-white/8"
-      >
-        {selectedSpeakers.length > 0 ? (
-          selectedSpeakers.map((speaker) => (
-            <span key={speaker.id} className="max-w-full truncate rounded border border-white/10 bg-white/8 px-1.5 py-0.5 text-[10px] text-white/70">
-              角色 · {speaker.name}
-            </span>
-          ))
-        ) : fallbackSpeakerNames.length > 0 ? (
-          fallbackSpeakerNames.map((speaker) => (
-            <span key={speaker} className="max-w-full truncate rounded border border-yellow-400/20 bg-yellow-400/10 px-1.5 py-0.5 text-[10px] text-yellow-100/80">
-              角色 · {speaker}
-            </span>
-          ))
-        ) : (
-          <span className="text-white/30">无</span>
-        )}
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 top-[40px] z-20 max-h-72 w-64 overflow-auto rounded-lg border border-white/10 bg-[#1b1b1b] p-1.5 shadow-xl">
-          {characterAssets.length > 0 ? (
-            characterAssets.map((asset) => (
-              <label key={asset.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/65 hover:bg-white/6">
-                <input
-                  type="checkbox"
-                  checked={selectedSpeakerIdSet.has(asset.id)}
-                  onChange={() => toggleSpeaker(asset)}
-                  className="h-3.5 w-3.5 accent-green-500"
-                />
-                <span className="shrink-0 text-white/35">角色</span>
-                <span className="truncate">{asset.name}</span>
-              </label>
-            ))
-          ) : (
-            <div className="px-2 py-4 text-center text-xs text-white/30">暂无角色资产</div>
-          )}
-        </div>
-      ) : null}
+      <MultiSelect
+        value={selectedSpeakerIds}
+        options={options}
+        onValueChange={handleSpeakerIdsChange}
+        selectedContent={selectedContent}
+        emptyText="暂无角色资产"
+        triggerClassName={TABLE_SELECT_TRIGGER_CLASS}
+        contentClassName="w-64"
+        ariaLabel={`选择镜头 ${shot.shotNumber} 台词角色`}
+      />
 
       <textarea
         className="min-h-[70px] w-full resize-none bg-transparent text-xs leading-relaxed text-white outline-none placeholder:text-white/20"
@@ -320,30 +311,7 @@ function ShotRow({
 
     setIsGeneratingVideo(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/shots/${shot.id}/video`, {
-        method: "POST",
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          payload &&
-            typeof payload === "object" &&
-            "error" in payload &&
-            typeof payload.error === "string"
-            ? payload.error
-            : "视频生成任务创建失败"
-        );
-      }
-
-      const taskId =
-        payload &&
-        typeof payload === "object" &&
-        "taskId" in payload &&
-        typeof payload.taskId === "string"
-          ? payload.taskId
-          : "";
-
+      const taskId = await createShotVideoTask(projectId, shot.id);
       onVideoTaskCreated(taskId ? `镜头 ${shot.shotNumber} 视频任务已创建：${taskId}` : `镜头 ${shot.shotNumber} 视频任务已创建`);
     } catch (error) {
       onGenerationError(error instanceof Error ? error.message : "视频生成任务创建失败");
@@ -384,7 +352,7 @@ function ShotRow({
           value={shot.sceneType || ""}
           onValueChange={(v) => up({ sceneType: (v === "__clear__" ? "" : v) as typeof shot.sceneType })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={cn(TABLE_SELECT_TRIGGER_CLASS, "[&>span]:text-center")}>
             <SelectValue placeholder={EMPTY_LABEL} />
           </SelectTrigger>
           <SelectContent>
@@ -458,12 +426,13 @@ export default function StoryboardTable() {
     isGeneratingAllImages,
     imageGenerationProgress,
     init,
-    generateShots,
     generateAllShotImages,
   } = useStoryboardStore();
   const initAssets = useAssetStore((s) => s.init);
   const [generateError, setGenerateError] = useState("");
   const [generateNotice, setGenerateNotice] = useState("");
+  const [isGeneratingAllVideos, setIsGeneratingAllVideos] = useState(false);
+  const [videoGenerationProgress, setVideoGenerationProgress] = useState({ completed: 0, total: 0 });
   const [preview, setPreview] = useState<{ url: string; title: string; kind: MediaPreviewKind } | null>(null);
 
   useEffect(() => {
@@ -472,17 +441,6 @@ export default function StoryboardTable() {
     initAssets(projectId);
   }, [projectId, init, initAssets]);
 
-  const handleGenerateShots = async () => {
-    if (!projectId) return;
-    setGenerateError("");
-    setGenerateNotice("");
-    try {
-      await generateShots(projectId);
-    } catch (error) {
-      setGenerateError(error instanceof Error ? error.message : "分镜生成失败");
-    }
-  };
-
   const handleGenerateAllShotImages = async () => {
     setGenerateError("");
     setGenerateNotice("");
@@ -490,6 +448,46 @@ export default function StoryboardTable() {
       await generateAllShotImages();
     } catch (error) {
       setGenerateError(error instanceof Error ? error.message : "批量生成分镜图失败");
+    }
+  };
+
+  const handleGenerateAllShotVideos = async () => {
+    if (!projectId) return;
+
+    const shotsWithImages = shots.filter((shot) => Boolean(shot.mediaUrl));
+    setGenerateError("");
+    setGenerateNotice("");
+
+    if (shotsWithImages.length === 0) {
+      setGenerateError("暂无可生成视频的分镜图，请先生成分镜图");
+      return;
+    }
+
+    setIsGeneratingAllVideos(true);
+    setVideoGenerationProgress({ completed: 0, total: shotsWithImages.length });
+
+    const failed: number[] = [];
+    let createdCount = 0;
+
+    for (const [index, shot] of shotsWithImages.entries()) {
+      try {
+        await createShotVideoTask(projectId, shot.id);
+        createdCount += 1;
+      } catch (error) {
+        failed.push(shot.shotNumber);
+        console.error(`Failed to create storyboard video task for shot ${shot.shotNumber}:`, error);
+      } finally {
+        setVideoGenerationProgress({ completed: index + 1, total: shotsWithImages.length });
+      }
+    }
+
+    setIsGeneratingAllVideos(false);
+
+    if (createdCount > 0) {
+      setGenerateNotice(`已创建 ${createdCount} 个分镜视频任务`);
+    }
+    if (failed.length > 0) {
+      setGenerateError(`${failed.length} 个分镜视频任务创建失败：${failed.join("、")}`);
     }
   };
 
@@ -508,7 +506,7 @@ export default function StoryboardTable() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => { handleGenerateAllShotImages(); }}
-            disabled={!projectId || shots.length === 0 || isLoading || isGeneratingAllImages}
+            disabled={!projectId || shots.length === 0 || isLoading || isGeneratingAllImages || isGeneratingAllVideos}
             className="flex h-9 items-center gap-2 rounded-lg bg-white/8 px-4 text-xs font-medium text-white/70 transition-colors hover:bg-white/14 hover:text-white disabled:opacity-40"
           >
             <Images className="h-3.5 w-3.5" />
@@ -517,12 +515,21 @@ export default function StoryboardTable() {
               : "生成全部分镜图"}
           </button>
           <button
-            onClick={() => { handleGenerateShots(); }}
-            disabled={!projectId || isLoading || isGeneratingAllImages}
-            className="flex h-9 items-center gap-2 rounded-lg bg-green-500/15 px-4 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-40"
+            onClick={() => { handleGenerateAllShotVideos(); }}
+            disabled={
+              !projectId ||
+              shots.length === 0 ||
+              shots.every((shot) => !shot.mediaUrl) ||
+              isLoading ||
+              isGeneratingAllImages ||
+              isGeneratingAllVideos
+            }
+            className="flex h-9 items-center gap-2 rounded-lg bg-white/8 px-4 text-xs font-medium text-white/70 transition-colors hover:bg-white/14 hover:text-white disabled:opacity-40"
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            {isLoading ? "生成中…" : "AI生成分镜"}
+            <Video className="h-3.5 w-3.5" />
+            {isGeneratingAllVideos
+              ? `视频 ${videoGenerationProgress.completed}/${videoGenerationProgress.total}`
+              : "生成全部分镜视频"}
           </button>
         </div>
       </div>
