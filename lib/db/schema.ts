@@ -5,6 +5,7 @@ import {
   boolean,
   integer,
   real,
+  jsonb,
   timestamp,
   index,
   unique,
@@ -131,6 +132,43 @@ export const videoClips = pgTable(
     label: text("label").notNull().default(""),
     mediaUrl: text("media_url"),
     subtitleText: text("subtitle_text"),
+    sourceShotId: uuid("source_shot_id").references(() => shots.id, { onDelete: "set null" }),
   },
-  (table) => [index("video_clips_project_id_idx").on(table.projectId)]
+  (table) => [
+    index("video_clips_project_id_idx").on(table.projectId),
+    index("video_clips_source_shot_id_idx").on(table.sourceShotId),
+    unique("video_clips_unique_project_source_shot_type").on(table.projectId, table.sourceShotId, table.clipType),
+  ]
+);
+
+export const videoGenerationTasks = pgTable(
+  "video_generation_tasks",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    shotId: uuid("shot_id")
+      .notNull()
+      .references(() => shots.id, { onDelete: "cascade" }),
+    providerTaskId: text("provider_task_id").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    status: text("status").notNull().default("queued"),
+    prompt: text("prompt").notNull().default(""),
+    videoUrl: text("video_url"),
+    mediaUrl: text("media_url"),
+    lastFrameUrl: text("last_frame_url"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("video_generation_tasks_provider_task_id_unique").on(table.providerTaskId),
+    index("video_generation_tasks_project_id_idx").on(table.projectId),
+    index("video_generation_tasks_project_status_idx").on(table.projectId, table.status),
+    index("video_generation_tasks_shot_id_idx").on(table.shotId),
+  ]
 );

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { videoClips } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type {
   IVideoClipRepository,
   CreateClipInput,
@@ -31,6 +31,7 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
         label: data.label ?? "",
         mediaUrl: data.mediaUrl ?? null,
         subtitleText: data.subtitleText ?? null,
+        sourceShotId: data.sourceShotId ?? null,
       })
       .returning();
     return rows[0];
@@ -65,9 +66,52 @@ export class VideoClipPostgresRepository implements IVideoClipRepository {
             label: c.label ?? "",
             mediaUrl: c.mediaUrl ?? null,
             subtitleText: c.subtitleText ?? null,
+            sourceShotId: c.sourceShotId ?? null,
           }))
         )
         .returning();
     });
+  }
+
+  async upsertVideoBySourceShot(projectId: string, shotId: string, data: CreateClipInput): Promise<VideoClipRow> {
+    const existing = await db
+      .select()
+      .from(videoClips)
+      .where(
+        and(
+          eq(videoClips.projectId, projectId),
+          eq(videoClips.sourceShotId, shotId),
+          eq(videoClips.clipType, "video")
+        )
+      );
+
+    const values = {
+      clipType: "video" as const,
+      startSec: data.startSec,
+      endSec: data.endSec,
+      label: data.label ?? "",
+      mediaUrl: data.mediaUrl ?? null,
+      subtitleText: data.subtitleText ?? null,
+      sourceShotId: shotId,
+    };
+
+    if (existing[0]) {
+      const rows = await db
+        .update(videoClips)
+        .set(values)
+        .where(eq(videoClips.id, existing[0].id))
+        .returning();
+      return rows[0];
+    }
+
+    const rows = await db
+      .insert(videoClips)
+      .values({
+        id: randomUUID(),
+        projectId,
+        ...values,
+      })
+      .returning();
+    return rows[0];
   }
 }

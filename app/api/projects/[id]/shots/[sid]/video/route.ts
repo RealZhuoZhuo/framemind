@@ -1,7 +1,11 @@
 import { shotRepo } from "@/lib/repositories";
 import { badRequest, notFound, ok, serverError } from "@/app/api/_helpers/api-response";
-import { buildShotVideoPrompt, getVideoGenerationProvider } from "@/lib/ai/video";
 import { signMediaUrl } from "@/lib/storage/media-url";
+import {
+  createShotVideoGenerationTask,
+  findVideoGenerationTask,
+  syncVideoGenerationTask,
+} from "@/lib/ai/video/task-service";
 import type {
   VideoGenerationRatio,
   VideoGenerationResolution,
@@ -119,9 +123,8 @@ export async function POST(
       return badRequest("Shot image URL is not available.");
     }
 
-    const task = await getVideoGenerationProvider().createVideoTask({
-      prompt: body.prompt || buildShotVideoPrompt(shot),
-      firstFrameUrl,
+    const task = await createShotVideoGenerationTask(shot, firstFrameUrl, {
+      prompt: body.prompt,
       resolution: body.resolution,
       ratio: body.ratio,
       duration: body.duration,
@@ -158,7 +161,12 @@ export async function GET(
       return badRequest("taskId is required.");
     }
 
-    const task = await getVideoGenerationProvider().getVideoTask(taskId);
+    const row = await findVideoGenerationTask(taskId);
+    if (!row || row.projectId !== id || row.shotId !== sid) {
+      return notFound("Video generation task not found");
+    }
+
+    const task = await syncVideoGenerationTask(row);
     return ok(task);
   } catch (e) {
     return serverError(e);

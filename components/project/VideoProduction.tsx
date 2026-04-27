@@ -2,7 +2,9 @@
 
 import { useRef, useEffect, useCallback } from "react";
 import { Play, Pause, Camera, Volume2 } from "lucide-react";
-import { useVideoStore } from "@/store/useVideoStore";
+import { useVideoStore, type VideoClip } from "@/store/useVideoStore";
+import { useProjectStore } from "@/store/useProjectStore";
+import { getMediaPreviewKind } from "@/components/project/MediaPreviewModal";
 
 const PX_PER_SEC = 80; // pixels per second on the timeline
 
@@ -21,9 +23,70 @@ function waveHeight(clipIndex: number, barIndex: number): number {
   );
 }
 
+function ClipPreviewLayer({
+  clip,
+  active,
+  offset,
+  playing,
+}: {
+  clip: VideoClip;
+  active: boolean;
+  offset: number;
+  playing: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaKind = getMediaPreviewKind(clip.mediaUrl);
+
+  useEffect(() => {
+    if (mediaKind !== "video") return;
+    const el = videoRef.current;
+    if (!el) return;
+
+    if (!active) {
+      el.pause();
+      return;
+    }
+
+    if (Math.abs(el.currentTime - offset) > 0.35) {
+      el.currentTime = Math.max(0, offset);
+    }
+
+    if (playing) {
+      el.play().catch(() => undefined);
+    } else {
+      el.pause();
+    }
+  }, [active, mediaKind, offset, playing]);
+
+  if (mediaKind === "video") {
+    return (
+      <video
+        ref={videoRef}
+        src={clip.mediaUrl}
+        muted
+        playsInline
+        preload="metadata"
+        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+        style={{ opacity: active ? 1 : 0 }}
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={clip.mediaUrl}
+      alt={clip.label}
+      className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+      style={{ opacity: active ? 1 : 0 }}
+    />
+  );
+}
+
 /* ─── Preview ────────────────────────────────────────────────────────────── */
 function PreviewArea() {
   const currentTime   = useVideoStore((s) => s.currentTime);
+  const isPlaying     = useVideoStore((s) => s.isPlaying);
   const videoClips    = useVideoStore((s) => s.videoClips);
   const subtitleClips = useVideoStore((s) => s.subtitleClips);
   const showSubtitles = useVideoStore((s) => s.showSubtitles);
@@ -41,15 +104,13 @@ function PreviewArea() {
       className="relative w-full bg-black overflow-hidden"
       style={{ aspectRatio: "16/9" }}
     >
-      {/* All image layers stacked; toggled via opacity */}
       {videoClips.map((clip) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ClipPreviewLayer
           key={clip.id}
-          src={clip.mediaUrl}
-          alt={clip.label}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-          style={{ opacity: clip.id === activeClip?.id ? 1 : 0 }}
+          clip={clip}
+          active={clip.id === activeClip?.id}
+          offset={currentTime - clip.start}
+          playing={isPlaying}
         />
       ))}
 
@@ -284,12 +345,21 @@ function Timeline() {
                   width: (clip.end - clip.start) * PX_PER_SEC - 2,
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={clip.mediaUrl}
-                  alt={clip.label}
-                  className="h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                />
+                {getMediaPreviewKind(clip.mediaUrl) === "video" ? (
+                  <video
+                    src={clip.mediaUrl}
+                    muted
+                    preload="metadata"
+                    className="h-full w-full object-cover opacity-80 transition-opacity group-hover:opacity-100"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={clip.mediaUrl}
+                    alt={clip.label}
+                    className="h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                  />
+                )}
                 {/* Dark gradient overlay at bottom */}
                 <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black/70 to-transparent" />
                 {/* Camera icon top-left */}
@@ -311,12 +381,19 @@ function Timeline() {
 
 /* ─── Root ───────────────────────────────────────────────────────────────── */
 export default function VideoProduction() {
+  const projectId      = useProjectStore((s) => s.projectId);
+  const init           = useVideoStore((s) => s.init);
   const isPlaying      = useVideoStore((s) => s.isPlaying);
   const setCurrentTime = useVideoStore((s) => s.setCurrentTime);
   const setPlaying     = useVideoStore((s) => s.setPlaying);
 
   const rafRef    = useRef<number>(0);
   const lastTsRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!projectId) return;
+    init(projectId);
+  }, [init, projectId]);
 
   useEffect(() => {
     if (!isPlaying) {

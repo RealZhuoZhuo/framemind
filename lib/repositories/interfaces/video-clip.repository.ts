@@ -9,6 +9,7 @@ export interface IVideoClipRepository {
   update(id: string, data: UpdateClipInput): Promise<VideoClipRow | null>;
   delete(id: string): Promise<void>;
   replaceAll(projectId: string, clips: CreateClipInput[]): Promise<VideoClipRow[]>;
+  upsertVideoBySourceShot(projectId: string, shotId: string, data: CreateClipInput): Promise<VideoClipRow>;
 }
 
 export type CreateClipInput = {
@@ -18,6 +19,7 @@ export type CreateClipInput = {
   label?: string;
   mediaUrl?: string | null;
   subtitleText?: string | null;
+  sourceShotId?: string | null;
 };
 
 export type UpdateClipInput = Partial<CreateClipInput>;

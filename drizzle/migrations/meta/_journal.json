@@ -64,6 +64,13 @@
       "when": 1777114800000,
       "tag": "0008_shot_dialogue_speakers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777118400000,
+      "tag": "0009_video_generation_tasks",
+      "breakpoints": true
     }
   ]
 }

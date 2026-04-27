@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageIcon, Images, GripVertical, MoreHorizontal, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
@@ -31,10 +31,54 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 const TABLE_SELECT_TRIGGER_CLASS =
   "min-h-[34px] rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 hover:border-white/20 hover:bg-white/8";
 
-async function createShotVideoTask(projectId: string, shotId: string) {
-  const response = await fetch(`/api/projects/${projectId}/shots/${shotId}/video`, {
-    method: "POST",
-  });
+type VideoGenerationTaskStatus =
+  | "queued"
+  | "running"
+  | "cancelled"
+  | "succeeded"
+  | "failed"
+  | "expired"
+  | "unknown";
+
+type VideoGenerationTask = {
+  id: string;
+  taskId: string;
+  shotId: string;
+  providerTaskId: string;
+  status: VideoGenerationTaskStatus;
+  mediaUrl: string | null;
+  videoUrl: string | null;
+  error: { code?: string; message?: string } | null;
+};
+
+function isActiveVideoTask(task: VideoGenerationTask | undefined) {
+  return task?.status === "queued" || task?.status === "running" || task?.status === "unknown";
+}
+
+function videoTaskLabel(task: VideoGenerationTask | undefined) {
+  if (!task) return "";
+  if (task.status === "queued") return "排队中";
+  if (task.status === "running") return "视频生成中";
+  if (task.status === "unknown") return "查询中";
+  if (task.status === "succeeded") return "视频已生成";
+  if (task.status === "failed") return "生成失败";
+  if (task.status === "expired") return "任务已过期";
+  if (task.status === "cancelled") return "任务已取消";
+  return "";
+}
+
+function isVideoGenerationTaskPayload(payload: unknown): payload is VideoGenerationTask {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      "id" in payload &&
+      "taskId" in payload &&
+      "shotId" in payload &&
+      "status" in payload
+  );
+}
+
+async function readTaskResponse(response: Response, fallbackMessage: string) {
   const payload: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -44,16 +88,47 @@ async function createShotVideoTask(projectId: string, shotId: string) {
         "error" in payload &&
         typeof payload.error === "string"
         ? payload.error
-        : "视频生成任务创建失败"
+        : fallbackMessage
     );
   }
 
-  return payload &&
-    typeof payload === "object" &&
-    "taskId" in payload &&
-    typeof payload.taskId === "string"
-    ? payload.taskId
-    : "";
+  if (!isVideoGenerationTaskPayload(payload)) {
+    throw new Error(fallbackMessage);
+  }
+
+  return payload;
+}
+
+async function createShotVideoTask(projectId: string, shotId: string) {
+  const response = await fetch(`/api/projects/${projectId}/shots/${shotId}/video`, {
+    method: "POST",
+  });
+  return readTaskResponse(response, "视频生成任务创建失败");
+}
+
+async function pollShotVideoTask(projectId: string, task: VideoGenerationTask) {
+  const response = await fetch(
+    `/api/projects/${projectId}/shots/${task.shotId}/video?taskId=${encodeURIComponent(task.id)}`
+  );
+  return readTaskResponse(response, "视频生成任务查询失败");
+}
+
+async function fetchProjectVideoTasks(projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}/video-tasks`);
+  const payload: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+        ? payload.error
+        : "视频生成任务加载失败"
+    );
+  }
+
+  return Array.isArray(payload) ? payload.filter(isVideoGenerationTaskPayload) : [];
 }
 
 function ImageCell({
@@ -63,6 +138,7 @@ function ImageCell({
   onPreview,
   isGenerating,
   isGeneratingVideo,
+  videoStatusLabel,
 }: {
   shot: Shot;
   onGenerate: () => void;
@@ -70,6 +146,7 @@ function ImageCell({
   onPreview: () => void;
   isGenerating: boolean;
   isGeneratingVideo: boolean;
+  videoStatusLabel?: string;
 }) {
   const mediaKind = shot.mediaUrl ? getMediaPreviewKind(shot.mediaUrl) : "image";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,6 +242,12 @@ function ImageCell({
           </div>
         ) : null}
       </div>
+
+      {videoStatusLabel ? (
+        <div className="absolute bottom-1.5 right-1.5 rounded-md border border-green-400/20 bg-black/75 px-2 py-1 text-[10px] text-green-100 shadow-lg shadow-black/30">
+          {videoStatusLabel}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -279,20 +362,23 @@ function DialogueCell({
 
 function ShotRow({
   shot,
+  videoTask,
   onPreviewMedia,
   onGenerationError,
   onVideoTaskCreated,
 }: {
   shot: Shot;
+  videoTask?: VideoGenerationTask;
   onPreviewMedia: (media: { url: string; title: string; kind: MediaPreviewKind }) => void;
   onGenerationError: (message: string) => void;
-  onVideoTaskCreated: (message: string) => void;
+  onVideoTaskCreated: (task: VideoGenerationTask, message: string) => void;
 }) {
   const { updateShot, generateShotImage } = useStoryboardStore();
   const projectId = useStoryboardStore((state) => state.projectId);
   const { assets } = useAssetStore();
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const hasActiveVideoTask = isActiveVideoTask(videoTask);
   const up = (patch: Partial<Shot>) => updateShot(shot.id, patch);
 
   const handleGenerateImage = async () => {
@@ -311,8 +397,8 @@ function ShotRow({
 
     setIsGeneratingVideo(true);
     try {
-      const taskId = await createShotVideoTask(projectId, shot.id);
-      onVideoTaskCreated(taskId ? `镜头 ${shot.shotNumber} 视频任务已创建：${taskId}` : `镜头 ${shot.shotNumber} 视频任务已创建`);
+      const task = await createShotVideoTask(projectId, shot.id);
+      onVideoTaskCreated(task, `镜头 ${shot.shotNumber} 视频任务已创建：${task.providerTaskId}`);
     } catch (error) {
       onGenerationError(error instanceof Error ? error.message : "视频生成任务创建失败");
     } finally {
@@ -343,7 +429,8 @@ function ShotRow({
             });
           }}
           isGenerating={isGeneratingImage}
-          isGeneratingVideo={isGeneratingVideo}
+          isGeneratingVideo={isGeneratingVideo || hasActiveVideoTask}
+          videoStatusLabel={videoTaskLabel(videoTask)}
         />
       </td>
 
@@ -433,13 +520,82 @@ export default function StoryboardTable() {
   const [generateNotice, setGenerateNotice] = useState("");
   const [isGeneratingAllVideos, setIsGeneratingAllVideos] = useState(false);
   const [videoGenerationProgress, setVideoGenerationProgress] = useState({ completed: 0, total: 0 });
+  const [videoTasks, setVideoTasks] = useState<VideoGenerationTask[]>([]);
+  const videoTasksRef = useRef<VideoGenerationTask[]>([]);
+  const completedTaskIdsRef = useRef(new Set<string>());
   const [preview, setPreview] = useState<{ url: string; title: string; kind: MediaPreviewKind } | null>(null);
+  const activeVideoTaskIds = videoTasks.filter(isActiveVideoTask).map((task) => task.id).join("|");
+
+  const mergeVideoTask = useCallback((task: VideoGenerationTask) => {
+    setVideoTasks((current) => {
+      const exists = current.some((item) => item.id === task.id);
+      return exists
+        ? current.map((item) => (item.id === task.id ? task : item))
+        : [task, ...current];
+    });
+  }, []);
 
   useEffect(() => {
     if (!projectId) return;
     init(projectId);
     initAssets(projectId);
   }, [projectId, init, initAssets]);
+
+  useEffect(() => {
+    videoTasksRef.current = videoTasks;
+  }, [videoTasks]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    let cancelled = false;
+    fetchProjectVideoTasks(projectId)
+      .then((tasks) => {
+        if (!cancelled) setVideoTasks(tasks);
+      })
+      .catch((error) => {
+        console.error("Failed to load video generation tasks:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    if (!activeVideoTaskIds) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      const activeTasks = videoTasksRef.current.filter(isActiveVideoTask);
+      if (activeTasks.length === 0) return;
+      const results = await Promise.allSettled(activeTasks.map((task) => pollShotVideoTask(projectId, task)));
+      for (const result of results) {
+        if (cancelled || result.status !== "fulfilled") continue;
+        const task = result.value;
+        mergeVideoTask(task);
+
+        if (task.status === "succeeded" && !completedTaskIdsRef.current.has(task.id)) {
+          completedTaskIdsRef.current.add(task.id);
+          setGenerateError("");
+          setGenerateNotice("视频已生成，并已同步到分镜和时间线");
+          init(projectId);
+        }
+
+        if ((task.status === "failed" || task.status === "expired" || task.status === "cancelled") && task.error?.message) {
+          setGenerateError(task.error.message);
+        }
+      }
+    };
+
+    poll();
+    const intervalId = window.setInterval(poll, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [projectId, activeVideoTaskIds, init, mergeVideoTask]);
 
   const handleGenerateAllShotImages = async () => {
     setGenerateError("");
@@ -454,12 +610,13 @@ export default function StoryboardTable() {
   const handleGenerateAllShotVideos = async () => {
     if (!projectId) return;
 
-    const shotsWithImages = shots.filter((shot) => Boolean(shot.mediaUrl));
+    const activeTaskShotIds = new Set(videoTasks.filter(isActiveVideoTask).map((task) => task.shotId));
+    const shotsWithImages = shots.filter((shot) => Boolean(shot.mediaUrl) && !activeTaskShotIds.has(shot.id));
     setGenerateError("");
     setGenerateNotice("");
 
     if (shotsWithImages.length === 0) {
-      setGenerateError("暂无可生成视频的分镜图，请先生成分镜图");
+      setGenerateError("暂无可新建视频任务的分镜图，请先生成分镜图或等待当前任务完成");
       return;
     }
 
@@ -471,7 +628,8 @@ export default function StoryboardTable() {
 
     for (const [index, shot] of shotsWithImages.entries()) {
       try {
-        await createShotVideoTask(projectId, shot.id);
+        const task = await createShotVideoTask(projectId, shot.id);
+        mergeVideoTask(task);
         createdCount += 1;
       } catch (error) {
         failed.push(shot.shotNumber);
@@ -568,12 +726,14 @@ export default function StoryboardTable() {
               <ShotRow
                 key={shot.id}
                 shot={shot}
+                videoTask={videoTasks.find((task) => task.shotId === shot.id && isActiveVideoTask(task))}
                 onPreviewMedia={setPreview}
                 onGenerationError={(message) => {
                   setGenerateNotice("");
                   setGenerateError(message);
                 }}
-                onVideoTaskCreated={(message) => {
+                onVideoTaskCreated={(task, message) => {
+                  mergeVideoTask(task);
                   setGenerateError("");
                   setGenerateNotice(message);
                 }}

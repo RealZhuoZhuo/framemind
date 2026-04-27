@@ -41,7 +41,14 @@ export async function GET(
 
     const videoClips = signedClips
       .filter((c) => c.clipType === "video")
-      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label }));
+      .map((c) => ({
+        id: c.id,
+        start: c.startSec,
+        end: c.endSec,
+        mediaUrl: c.mediaUrl ?? "",
+        label: c.label,
+        sourceShotId: c.sourceShotId,
+      }));
 
     const subtitleClips = clips
       .filter((c) => c.clipType === "subtitle")

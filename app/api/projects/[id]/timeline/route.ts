@@ -9,7 +9,14 @@ async function formatTimeline(clips: VideoClipRow[]) {
   return {
     videoClips: signedClips
       .filter((c) => c.clipType === "video")
-      .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, mediaUrl: c.mediaUrl ?? "", label: c.label })),
+      .map((c) => ({
+        id: c.id,
+        start: c.startSec,
+        end: c.endSec,
+        mediaUrl: c.mediaUrl ?? "",
+        label: c.label,
+        sourceShotId: c.sourceShotId,
+      })),
     subtitleClips: signedClips
       .filter((c) => c.clipType === "subtitle")
       .map((c) => ({ id: c.id, start: c.startSec, end: c.endSec, text: c.subtitleText ?? "" })),
@@ -42,7 +49,7 @@ export async function PUT(
     const body = await request.json();
     const { videoClips = [], subtitleClips = [], audioClips = [] } = body;
 
-    type RawVideo = { start: number; end: number; mediaUrl?: string; label?: string };
+    type RawVideo = { start: number; end: number; mediaUrl?: string; label?: string; sourceShotId?: string | null };
     type RawSubtitle = { start: number; end: number; text?: string };
     type RawAudio = { start: number; end: number; label?: string };
 
@@ -53,6 +60,7 @@ export async function PUT(
         endSec: c.end,
         mediaUrl: normalizeMediaStorageValue(c.mediaUrl),
         label: c.label ?? "",
+        sourceShotId: c.sourceShotId ?? null,
       })),
       ...subtitleClips.map((c: RawSubtitle) => ({
         clipType: "subtitle" as ClipType,

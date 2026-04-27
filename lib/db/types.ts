@@ -24,3 +24,6 @@ export type ShotWithAssets = ShotRow & {
 
 export type VideoClipRow = InferSelectModel<typeof schema.videoClips>;
 export type VideoClipInsert = InferInsertModel<typeof schema.videoClips>;
+
+export type VideoGenerationTaskRow = InferSelectModel<typeof schema.videoGenerationTasks>;
+export type VideoGenerationTaskInsert = InferInsertModel<typeof schema.videoGenerationTasks>;

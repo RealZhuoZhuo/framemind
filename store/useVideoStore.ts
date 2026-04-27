@@ -6,6 +6,7 @@ export type VideoClip = {
   end: number;
   mediaUrl: string;
   label: string;
+  sourceShotId?: string | null;
 };
 
 export type SubtitleClip = {
@@ -23,6 +24,7 @@ export type AudioClip = {
 };
 
 type VideoStore = {
+  isLoading: boolean;
   duration: number;
   currentTime: number;
   isPlaying: boolean;
@@ -31,6 +33,7 @@ type VideoStore = {
   subtitleClips: SubtitleClip[];
   audioClips: AudioClip[];
 
+  init: (projectId: string) => Promise<void>;
   setCurrentTime: (t: number) => void;
   setPlaying: (p: boolean) => void;
   toggleSubtitles: () => void;
@@ -39,6 +42,29 @@ type VideoStore = {
   addSubtitleClip: (clip: SubtitleClip) => void;
   addAudioClip: (clip: AudioClip) => void;
 };
+
+type TimelinePayload = {
+  videoClips?: VideoClip[];
+  subtitleClips?: SubtitleClip[];
+  audioClips?: AudioClip[];
+};
+
+async function readJsonOrThrow<T>(res: Response): Promise<T> {
+  const payload = await res.json();
+
+  if (!res.ok) {
+    const message =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
+        ? payload.error
+        : "Request failed";
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
 
 const DURATION = 30; // 5 clips × 5 s + 5 s tail room
 
@@ -87,7 +113,18 @@ const defaultAudioClips: AudioClip[] = [
   { id: "a5", start: 20, end: 25, label: "旁白" },
 ];
 
-export const useVideoStore = create<VideoStore>((set) => ({
+function durationForClips(videoClips: VideoClip[], subtitleClips: SubtitleClip[], audioClips: AudioClip[]) {
+  const maxEnd = Math.max(
+    0,
+    ...videoClips.map((clip) => clip.end),
+    ...subtitleClips.map((clip) => clip.end),
+    ...audioClips.map((clip) => clip.end)
+  );
+  return Math.max(DURATION, maxEnd);
+}
+
+export const useVideoStore = create<VideoStore>((set, get) => ({
+  isLoading: false,
   duration: DURATION,
   currentTime: 0,
   isPlaying: false,
@@ -96,8 +133,32 @@ export const useVideoStore = create<VideoStore>((set) => ({
   subtitleClips: defaultSubtitleClips,
   audioClips: defaultAudioClips,
 
+  init: async (projectId) => {
+    set({ isLoading: true });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/timeline`);
+      const payload = await readJsonOrThrow<TimelinePayload>(res);
+      const videoClips = payload.videoClips ?? [];
+      const subtitleClips = payload.subtitleClips ?? [];
+      const audioClips = payload.audioClips ?? [];
+      const duration = durationForClips(videoClips, subtitleClips, audioClips);
+
+      set({
+        videoClips,
+        subtitleClips,
+        audioClips,
+        duration,
+        currentTime: Math.min(get().currentTime, duration),
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error("Failed to load timeline:", error);
+      set({ isLoading: false });
+    }
+  },
+
   setCurrentTime: (t) =>
-    set({ currentTime: Math.max(0, Math.min(t, DURATION)) }),
+    set({ currentTime: Math.max(0, Math.min(t, get().duration)) }),
 
   addVideoClip: (clip) =>
     set((s) => ({ videoClips: [...s.videoClips, clip] })),

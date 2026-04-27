@@ -22,6 +22,26 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## AI video generation
+
+Storyboard video generation uses Ark Seedance by default. Configure one of these keys in `.env.local` or your deployment environment:
+
+```bash
+ARK_VIDEO_API_KEY=...
+# or
+ARK_API_KEY=...
+# or
+VIDEO_GENERATION_API_KEY=...
+```
+
+Optional overrides:
+
+```bash
+VIDEO_GENERATION_PROVIDER=ark-seedance
+ARK_VIDEO_ENDPOINT=https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
+ARK_VIDEO_MODEL=doubao-seedance-1-5-pro-251215
+```
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
