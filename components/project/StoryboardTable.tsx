@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageIcon, Images, Download, GripVertical, Sparkles } from "lucide-react";
+import { ImageIcon, Images, Download, GripVertical, Sparkles, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoryboardStore, SCENE_TYPES, type Shot } from "@/store/useStoryboardStore";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
 import { useProjectStore } from "@/store/useProjectStore";
+import {
+  getMediaPreviewKind,
+  MediaPreviewModal,
+  type MediaPreviewKind,
+} from "@/components/project/MediaPreviewModal";
 import {
   Select,
   SelectContent,
@@ -23,18 +28,38 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   prop: "道具",
 };
 
-function ImageCell({ shot, onGenerate, isGenerating }: { shot: Shot; onGenerate: () => void; isGenerating: boolean }) {
+function ImageCell({
+  shot,
+  onGenerate,
+  onPreview,
+  isGenerating,
+}: {
+  shot: Shot;
+  onGenerate: () => void;
+  onPreview: () => void;
+  isGenerating: boolean;
+}) {
+  const mediaKind = shot.mediaUrl ? getMediaPreviewKind(shot.mediaUrl) : "image";
+  const MediaIcon = mediaKind === "video" ? Video : ImageIcon;
+
   return (
     <div className="relative flex h-36 w-full items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-[#0d0d0d]">
       {shot.mediaUrl ? (
         <>
-          <img
-            src={shot.mediaUrl}
-            alt={`镜头 ${shot.shotNumber}`}
-            className="h-full w-full object-contain"
-          />
-          <div className="absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5">
-            <ImageIcon className="h-3 w-3 text-white/60" />
+          <button
+            type="button"
+            onClick={onPreview}
+            className="absolute inset-0 cursor-zoom-in"
+            aria-label={`预览镜头 ${shot.shotNumber}`}
+          >
+            {mediaKind === "video" ? (
+              <video src={shot.mediaUrl} muted preload="metadata" className="h-full w-full object-contain" />
+            ) : (
+              <img src={shot.mediaUrl} alt={`镜头 ${shot.shotNumber}`} className="h-full w-full object-contain" />
+            )}
+          </button>
+          <div className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5">
+            <MediaIcon className="h-3 w-3 text-white/60" />
           </div>
           <button className="absolute bottom-1.5 right-1.5 rounded bg-black/60 p-1 text-white/40 transition-colors hover:text-white">
             <Download className="h-3 w-3" />
@@ -199,7 +224,13 @@ function DialogueCell({
   );
 }
 
-function ShotRow({ shot }: { shot: Shot }) {
+function ShotRow({
+  shot,
+  onPreviewMedia,
+}: {
+  shot: Shot;
+  onPreviewMedia: (media: { url: string; title: string; kind: MediaPreviewKind }) => void;
+}) {
   const { updateShot, generateShotImage } = useStoryboardStore();
   const { assets } = useAssetStore();
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -224,7 +255,19 @@ function ShotRow({ shot }: { shot: Shot }) {
       </td>
 
       <td className="w-40 border-r border-white/5 px-2 py-3">
-        <ImageCell shot={shot} onGenerate={handleGenerateImage} isGenerating={isGeneratingImage} />
+        <ImageCell
+          shot={shot}
+          onGenerate={handleGenerateImage}
+          onPreview={() => {
+            if (!shot.mediaUrl) return;
+            onPreviewMedia({
+              url: shot.mediaUrl,
+              title: `镜头 ${shot.shotNumber}`,
+              kind: getMediaPreviewKind(shot.mediaUrl),
+            });
+          }}
+          isGenerating={isGeneratingImage}
+        />
       </td>
 
       <td className="w-24 border-r border-white/5 px-2 py-3">
@@ -311,6 +354,7 @@ export default function StoryboardTable() {
   } = useStoryboardStore();
   const initAssets = useAssetStore((s) => s.init);
   const [generateError, setGenerateError] = useState("");
+  const [preview, setPreview] = useState<{ url: string; title: string; kind: MediaPreviewKind } | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
@@ -394,9 +438,21 @@ export default function StoryboardTable() {
               ))}
             </tr>
           </thead>
-          <tbody>{shots.map((shot) => <ShotRow key={shot.id} shot={shot} />)}</tbody>
+          <tbody>
+            {shots.map((shot) => (
+              <ShotRow key={shot.id} shot={shot} onPreviewMedia={setPreview} />
+            ))}
+          </tbody>
         </table>
       </div>
+
+      <MediaPreviewModal
+        open={Boolean(preview)}
+        url={preview?.url ?? null}
+        title={preview?.title}
+        kind={preview?.kind}
+        onClose={() => setPreview(null)}
+      />
     </div>
   );
 }

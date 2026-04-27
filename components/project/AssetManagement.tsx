@@ -5,6 +5,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { Box, Building2, Images, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, UserCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetType } from "@/store/useAssetStore";
+import { MediaPreviewModal } from "@/components/project/MediaPreviewModal";
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   character: "角色",
@@ -47,12 +48,14 @@ function EditAssetModal({
   onClose,
   onSave,
   onGenerateImage,
+  onPreviewImage,
 }: {
   initial: EditFields;
   mediaUrl?: string | null;
   onClose: () => void;
   onSave: (data: EditFields) => void | Promise<void>;
   onGenerateImage?: (data: EditFields) => void | Promise<void>;
+  onPreviewImage?: () => void;
 }) {
   const [form, setForm] = useState<EditFields>(initial);
   const [loading, setLoading] = useState(false);
@@ -104,7 +107,14 @@ function EditAssetModal({
         <div className="flex w-full pt-[57px] pb-[61px] overflow-hidden">
           <div className="relative flex w-1/2 shrink-0 flex-col items-center justify-center border-r border-white/8 bg-[#111]">
             {mediaUrl ? (
-              <img src={mediaUrl} alt={initial.name || "资产参考图"} className="h-full w-full object-contain" />
+              <button
+                type="button"
+                onClick={onPreviewImage}
+                className="h-full w-full cursor-zoom-in"
+                aria-label="预览资产参考图"
+              >
+                <img src={mediaUrl} alt={initial.name || "资产参考图"} className="h-full w-full object-contain" />
+              </button>
             ) : (
               <>
                 <AssetIcon type={form.type} className="h-24 w-24 text-white/10" />
@@ -154,7 +164,17 @@ function EditAssetModal({
   );
 }
 
-function AssetCard({ asset, onEdit, onDelete }: { asset: Asset; onEdit: () => void; onDelete: () => void }) {
+function AssetCard({
+  asset,
+  onEdit,
+  onDelete,
+  onPreview,
+}: {
+  asset: Asset;
+  onEdit: () => void;
+  onDelete: () => void;
+  onPreview: () => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -188,7 +208,9 @@ function AssetCard({ asset, onEdit, onDelete }: { asset: Asset; onEdit: () => vo
 
       <div className={cn("relative flex h-56 items-center justify-center bg-gradient-to-b", asset.gradientFrom, "to-[#111]")}>
         {asset.mediaUrl ? (
-          <img src={asset.mediaUrl} alt={asset.name} className="h-full w-full object-contain" />
+          <button type="button" onClick={onPreview} className="h-full w-full cursor-zoom-in" aria-label={`预览${asset.name}`}>
+            <img src={asset.mediaUrl} alt={asset.name} className="h-full w-full object-contain" />
+          </button>
         ) : (
           <AssetIcon type={asset.type} className="h-20 w-20 text-white/10" />
         )}
@@ -235,6 +257,7 @@ export default function AssetManagement() {
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<AssetFilter>("all");
   const [generateError, setGenerateError] = useState("");
+  const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     if (projectId) init(projectId);
@@ -298,7 +321,15 @@ export default function AssetManagement() {
 
       <div className="grid grid-cols-4 gap-4">
         {visibleAssets.map((asset) => (
-          <AssetCard key={asset.id} asset={asset} onEdit={() => setEditingId(asset.id)} onDelete={() => removeAsset(asset.id)} />
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            onEdit={() => setEditingId(asset.id)}
+            onDelete={() => removeAsset(asset.id)}
+            onPreview={() => {
+              if (asset.mediaUrl) setPreview({ url: asset.mediaUrl, title: asset.name });
+            }}
+          />
         ))}
         <AddCard onClick={() => setAdding(true)} />
       </div>
@@ -326,12 +357,23 @@ export default function AssetManagement() {
           mediaUrl={editingAsset.mediaUrl}
           onClose={() => setEditingId(null)}
           onSave={(data) => updateAsset(editingAsset.id, data)}
+          onPreviewImage={() => {
+            if (editingAsset.mediaUrl) setPreview({ url: editingAsset.mediaUrl, title: editingAsset.name });
+          }}
           onGenerateImage={async (data) => {
             await updateAsset(editingAsset.id, data);
             await generateAssetImage(editingAsset.id);
           }}
         />
       ) : null}
+
+      <MediaPreviewModal
+        open={Boolean(preview)}
+        url={preview?.url ?? null}
+        title={preview?.title}
+        kind="image"
+        onClose={() => setPreview(null)}
+      />
     </>
   );
 }
